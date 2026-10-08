@@ -1,0 +1,695 @@
+/* Komponenten. Benennung nach BEM: Block (.clock), Element
+   (.clock__time), Modifier (.panel--wide).
+
+   Verschachtelt (CSS-Nesting) werden Zustände, Medienabfragen und
+   Kindelemente ohne eigene Klasse. BEM-Elemente stehen dagegen flach:
+   Natives Nesting kann aus "&__time" keinen Klassennamen zusammensetzen,
+   das geht nur in Sass. */
+@layer components {
+  /* --- Panels (Anmeldung, Brettwahl, Warten) ------------------------- */
+  .panel {
+    width: min(26rem, 100%);
+    padding: clamp(var(--space-5), 5vw, var(--space-6));
+    background: var(--c-panel);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-panel);
+    text-align: center;
+  }
+
+  .panel--wide {
+    width: min(44rem, 100%);
+  }
+
+  .panel__title {
+    font-size: var(--step-2);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+
+  .panel__text {
+    margin-block-start: var(--space-3);
+    color: var(--c-text-quiet);
+  }
+
+  .panel__text--quiet {
+    font-family: var(--font-num);
+    font-size: var(--step-minus-1);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .panel__more {
+    margin-block-start: var(--space-4);
+  }
+
+  .panel__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-3);
+    margin-block-start: var(--space-5);
+  }
+
+  /* --- Formular ------------------------------------------------------ */
+  .form {
+    margin-block-start: var(--space-5);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .field {
+    display: block;
+    text-align: start;
+  }
+
+  .field__label {
+    display: block;
+    margin-block-end: var(--space-2);
+    font-size: var(--step-minus-1);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--c-text-quiet);
+  }
+
+  .field__input,
+  .field__select {
+    width: 100%;
+    min-height: var(--touch);
+    padding: var(--space-2) var(--space-3);
+    /* Mindestens 16px: sonst zoomt iOS beim Antippen in das Feld hinein.
+       Eine der wenigen Stellen, an denen px gemeint ist. */
+    font-size: max(1rem, 16px);
+    background: var(--c-field);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius);
+
+    &:focus-visible {
+      border-color: var(--c-accent);
+    }
+  }
+
+  /* Ein leeres Pflichtfeld nach dem ersten Absenden sichtbar machen –
+     ohne JavaScript, über :user-invalid. */
+  .field__input:user-invalid {
+    border-color: var(--c-error);
+  }
+
+  /* --- Buttons ------------------------------------------------------- */
+  .button {
+    min-height: var(--touch);
+    padding: var(--space-2) var(--space-5);
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition:
+      background-color var(--fade) ease,
+      color var(--fade) ease;
+  }
+
+  .button--primary {
+    background: var(--c-primary);
+    color: var(--c-panel);
+  }
+
+  .button--quiet {
+    background: transparent;
+    border-color: var(--c-border);
+    color: var(--c-text-quiet);
+  }
+
+  @media (hover: hover) {
+    .button--primary:hover {
+      background: color-mix(in oklab, var(--c-primary) 85%, white);
+    }
+    .button--quiet:hover {
+      background: var(--c-panel-sunk);
+    }
+  }
+
+  /* Zweistufiges Aufgeben: der erste Klick "schärft" den Knopf. */
+  .button[data-armed='true'] {
+    border-color: var(--c-error);
+    color: var(--c-error);
+    font-weight: 600;
+  }
+
+  .link-button {
+    all: unset;
+    cursor: pointer;
+    color: var(--c-primary);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+    font-size: var(--step-minus-1);
+
+    /* Nicht doppelt zu base.css: "all: unset" oben setzt auch outline
+       zurück, und dieser Layer liegt über base. Ohne diese Zeile hätte
+       der Link keinen sichtbaren Fokus. */
+    &:focus-visible {
+      outline: 2px solid var(--c-accent);
+      outline-offset: 2px;
+    }
+  }
+
+  .icon-button {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: var(--touch);
+    min-height: var(--touch);
+    justify-content: center;
+    padding: var(--space-2);
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-round);
+    color: var(--c-text);
+    cursor: pointer;
+
+    @media (hover: hover) {
+      &:hover {
+        background: rgb(0 0 0 / 6%);
+      }
+    }
+  }
+
+  /* --- Brettauswahl -------------------------------------------------- */
+  .themes {
+    margin: 0;
+    margin-block-start: var(--space-5);
+    padding: 0;
+    border: 0;
+  }
+
+  .themes__options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+    gap: var(--space-3);
+  }
+
+  .themes__options--compact {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+
+  .theme {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-1);
+    padding: var(--space-2);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: background-color var(--fade) ease;
+
+    @media (hover: hover) {
+      &:hover {
+        background: var(--c-panel-sunk);
+      }
+    }
+
+    /* Ausgewählte Karte hervorheben – über :has(), statt im JavaScript
+       eine Klasse zu setzen. */
+    &:has(input:checked) {
+      background: var(--c-highlight);
+      box-shadow: inset 0 0 0 2px var(--c-accent);
+    }
+
+    &:has(input:focus-visible) {
+      outline: 2px solid var(--c-accent);
+      outline-offset: 2px;
+    }
+  }
+
+  /* Ein Brettausschnitt von 4x4 Feldern mit den beiden Startsteinen.
+     Die Farben kommen aus den Brett-Tokens: jedes Vorschaubrett trägt
+     sein eigenes data-board (siehe tokens.css). */
+  .theme__preview {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: var(--radius);
+    background-color: var(--c-felt);
+    background-image:
+      linear-gradient(to right, var(--c-felt-line) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--c-felt-line) 1px, transparent 1px);
+    background-size: 25% 25%;
+    box-shadow:
+      inset 0 0 0 2px var(--c-felt-line),
+      var(--shadow-disc);
+  }
+
+  .theme__preview::before,
+  .theme__preview::after {
+    content: '';
+    margin: 14%;
+    border-radius: 50%;
+    box-shadow: var(--shadow-disc);
+  }
+
+  .theme__preview::before {
+    grid-area: 2 / 2;
+    background: var(--c-ink);
+  }
+  .theme__preview::after {
+    grid-area: 3 / 3;
+    background: var(--c-bone);
+  }
+
+  .theme__name {
+    margin-block-start: var(--space-1);
+    font-size: var(--step-0);
+  }
+
+  .theme:has(input:checked) .theme__name {
+    font-weight: 600;
+  }
+
+  /* --- Wartebildschirm ---------------------------------------------- */
+  .panel--waiting {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-2);
+  }
+
+  /* Ein einzelner Stein, der sich langsam dreht. Kein Spinner: das
+     Warten gehört zum Spiel, nicht zur Technik. */
+  .pulse-disc {
+    width: 3.5rem;
+    aspect-ratio: 1;
+    margin-block-end: var(--space-3);
+    border-radius: 50%;
+    background: linear-gradient(90deg, var(--stone-b) 50%, var(--stone-w) 50%);
+    box-shadow: var(--shadow-disc);
+    /* Bei --motion: 0 wird die Dauer 0 und der Stein steht still. */
+    animation: turning calc(2.4s * var(--motion)) linear infinite;
+  }
+
+  @keyframes turning {
+    from {
+      transform: rotateY(0deg);
+    }
+    to {
+      transform: rotateY(360deg);
+    }
+  }
+
+  /* --- Karten im Spiel ---------------------------------------------- */
+  .card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    background: var(--c-panel);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-panel);
+    /* Die Karte passt ihren Inhalt an die eigene Breite an, nicht an die
+       des Bildschirms – siehe @container weiter unten. */
+    container-type: inline-size;
+  }
+
+  /* --- Spielstand ---------------------------------------------------- */
+  .scoreline {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-2);
+  }
+
+  .score {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+      'stone value'
+      'name  name';
+    align-items: center;
+    column-gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius);
+    background: var(--c-panel-sunk);
+    transition:
+      background-color var(--fade) ease,
+      box-shadow var(--fade) ease;
+
+    /* Wer am Zug ist, wird am Spielstand selbst hervorgehoben. */
+    &[data-active='true'] {
+      background: var(--c-highlight);
+      box-shadow: inset 0 0 0 2px var(--c-accent);
+    }
+
+    & .stone-badge {
+      grid-area: stone;
+    }
+  }
+
+  .score__value {
+    grid-area: value;
+    justify-self: end;
+    font-family: var(--font-num);
+    font-size: var(--step-2);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+
+  .score__name {
+    grid-area: name;
+    font-size: var(--step-minus-1);
+    color: var(--c-text-quiet);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* In einer breiten Karte (Handy hochkant, volle Breite) stehen Stein,
+     Zahl und Name in einer Zeile – das spart Höhe über dem Brett. */
+  @container (min-width: 19.5rem) {
+    .score {
+      grid-template-columns: auto 1fr auto;
+      grid-template-areas: 'stone name value';
+    }
+  }
+
+  /* --- Steine als Anzeige (Punktestand, Zugverlauf, Vorschau) --------- */
+  .stone-badge {
+    display: inline-grid;
+    place-items: center;
+    width: 1.25rem;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    box-shadow:
+      inset 0 0 0 1px rgb(0 0 0 / 28%),
+      var(--shadow-disc);
+    flex: none;
+  }
+
+  .stone-badge[data-side='black'] {
+    background: radial-gradient(circle at 34% 28%, var(--stone-b-hi), var(--stone-b) 60%);
+  }
+
+  .stone-badge[data-side='white'] {
+    background: radial-gradient(circle at 34% 28%, var(--stone-w-hi), var(--stone-w) 60%);
+  }
+
+  .stone-badge--small {
+    width: 0.875rem;
+  }
+  .stone-badge--preview {
+    width: 2rem;
+  }
+
+  /* --- Kräfteverhältnis --------------------------------------------
+     Zwei Segmente, deren Breite sich mit jedem Zug verschiebt. Der
+     Übergang ist etwas länger als die Steindrehung, damit man beides
+     nacheinander wahrnimmt. */
+  .tally {
+    display: flex;
+    height: 0.625rem;
+    overflow: hidden;
+    border-radius: var(--radius-round);
+    background: var(--stone-w);
+    box-shadow: inset 0 0 0 1px rgb(0 0 0 / 20%);
+  }
+
+  .tally__black {
+    width: 50%;
+    flex: 0 0 auto;
+    background: var(--stone-b);
+    transition: width calc(600ms * var(--motion)) var(--ease-flip) calc(200ms * var(--motion));
+  }
+
+  .tally__white {
+    flex: 1;
+    background: var(--stone-w-lo);
+  }
+
+  .turn {
+    font-size: clamp(var(--step-0), 3.2vmin + 0.4rem, var(--step-1));
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+  }
+
+  /* --- Bedenkzeit ---------------------------------------------------- */
+  .clock {
+    display: grid;
+    gap: var(--space-1);
+  }
+
+  .clock__row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--space-2);
+    font-size: var(--step-minus-1);
+    color: var(--c-text-quiet);
+  }
+
+  .clock__time {
+    font-family: var(--font-num);
+    font-variant-numeric: tabular-nums;
+    font-size: var(--step-0);
+    color: var(--c-text);
+  }
+
+  .clock__bar {
+    height: 0.375rem;
+    overflow: hidden;
+    border-radius: var(--radius-round);
+    background: var(--c-panel-sunk);
+  }
+
+  .clock__fill {
+    display: block;
+    height: 100%;
+    background: var(--c-text-quiet);
+    /* Der Balken schrumpft von rechts nach links. */
+    transform-origin: left center;
+    transition: transform calc(250ms * var(--motion)) linear;
+  }
+
+  /* Eigene Uhr: kräftiger. Knappe Zeit: nicht nur farbig, sondern auch
+     fett und blinkend – damit es auch ohne Farbwahrnehmung auffällt. */
+  .clock[data-mine='true'] {
+    & .clock__fill {
+      background: var(--c-primary);
+    }
+
+    &[data-state='warn'] {
+      & .clock__fill {
+        background: var(--c-warn);
+      }
+      & .clock__time {
+        color: var(--c-warn);
+        font-weight: 700;
+      }
+    }
+
+    &[data-state='critical'] {
+      & .clock__fill {
+        background: var(--c-error);
+      }
+
+      & .clock__time {
+        color: var(--c-error);
+        font-weight: 700;
+        animation: blink calc(1s * var(--motion)) steps(2, jump-none) infinite;
+      }
+    }
+  }
+
+  @keyframes blink {
+    50% {
+      opacity: 0.35;
+    }
+  }
+
+  .hint {
+    font-size: var(--step-minus-1);
+    color: var(--c-warn);
+  }
+
+  .hint:empty {
+    display: none;
+  }
+
+  .strikes {
+    font-size: var(--step-minus-1);
+    color: var(--c-error);
+  }
+
+  /* --- Details: Zugverlauf, Regeln, Aktionen ------------------------- */
+  .details summary {
+    cursor: pointer;
+    font-weight: 600;
+    padding-block: var(--space-1);
+  }
+
+  .log__list {
+    list-style: none;
+    display: grid;
+    gap: 0.125rem;
+    max-height: 13rem;
+    overflow-y: auto;
+    margin-block-start: var(--space-2);
+    font-size: var(--step-minus-1);
+    overscroll-behavior: contain;
+  }
+
+  .log__item {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius);
+  }
+
+  .log__item:first-child {
+    background: var(--c-panel-sunk);
+  }
+  .log__item[data-type='pass'] {
+    color: var(--c-warn);
+  }
+
+  .log__n {
+    min-width: 1.75em;
+    font-family: var(--font-num);
+    font-variant-numeric: tabular-nums;
+    color: var(--c-text-quiet);
+    text-align: end;
+  }
+
+  .log__tag {
+    padding: 0 var(--space-2);
+    border-radius: var(--radius-round);
+    font-size: var(--step-minus-2);
+    background: var(--c-panel-sunk);
+    border: 1px solid var(--c-line);
+  }
+
+  .log__empty {
+    margin-block-start: var(--space-2);
+    font-size: var(--step-minus-1);
+    color: var(--c-text-quiet);
+  }
+
+  .rules__list {
+    display: grid;
+    gap: var(--space-2);
+    margin-block-start: var(--space-2);
+    padding-inline-start: 1.1rem;
+    font-size: var(--step-minus-1);
+    color: var(--c-text-quiet);
+  }
+
+  .details__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    padding-block-start: var(--space-2);
+    border-block-start: 1px solid var(--c-line);
+
+    & .button {
+      flex: 1 1 8rem;
+    }
+  }
+
+  .notice {
+    margin-block-start: var(--space-3);
+    font-size: var(--step-minus-1);
+  }
+  .notice--error {
+    color: var(--c-error);
+  }
+
+  /* --- Einblendung über dem Brett ------------------------------------
+     Liegt im selben Rasterfeld wie das Brett und damit genau darüber –
+     ohne position: absolute und ohne Rechnen im JavaScript. */
+  .banner {
+    --ring: transparent;
+
+    grid-area: board;
+    place-self: center;
+    z-index: 2;
+    max-width: 86%;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-lg);
+    background: var(--c-overlay);
+    color: var(--c-on-overlay);
+    font-size: var(--step-0);
+    line-height: 1.4;
+    text-align: center;
+    box-shadow:
+      0 0 0 2px var(--ring),
+      var(--shadow-float);
+    cursor: pointer;
+    transition:
+      opacity var(--fade) ease,
+      scale var(--fade) ease;
+
+    @starting-style {
+      opacity: 0;
+      scale: 0.94;
+    }
+
+    &[data-tone='bad'] {
+      --ring: var(--c-ring-bad);
+    }
+    &[data-tone='warn'] {
+      --ring: var(--c-ring-warn);
+    }
+    &[data-tone='good'] {
+      --ring: var(--c-ring-good);
+    }
+  }
+
+  /* --- Kurze Hinweise -----------------------------------------------
+     Oben mittig über der Kopfzeile – dort verdecken sie weder das Brett
+     noch die Knöpfe. pointer-events: none, damit ein Tipp, der zufällig
+     auf einen Hinweis fällt, trotzdem beim Element darunter ankommt. */
+  .toasts {
+    position: fixed;
+    inset-inline: var(--gutter);
+    inset-block-start: calc(var(--space-2) + env(safe-area-inset-top));
+    z-index: 20;
+    display: grid;
+    justify-items: center;
+    gap: var(--space-2);
+    pointer-events: none;
+  }
+
+  .toast {
+    /* Mindestens so hoch wie der Titel darunter: sonst schaut der Titel
+       unter einem einzeiligen Hinweis halb hervor. */
+    display: flex;
+    align-items: center;
+    min-height: 3.5rem;
+    max-width: min(100%, 30rem);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-lg);
+    background: var(--c-panel-raised);
+    color: var(--c-text);
+    font-size: var(--step-minus-1);
+    line-height: 1.45;
+    box-shadow:
+      var(--shadow-panel),
+      inset 0 0 0 1px var(--c-line);
+    border-inline-start: 4px solid var(--c-text-quiet);
+    transition:
+      opacity var(--fade) ease,
+      translate var(--fade) ease;
+
+    @starting-style {
+      opacity: 0;
+      translate: 0 -0.5rem;
+    }
+
+    &[data-tone='good'] {
+      border-inline-start-color: var(--c-good);
+    }
+    &[data-tone='warn'] {
+      border-inline-start-color: var(--c-warn);
+    }
+    &[data-tone='bad'] {
+      border-inline-start-color: var(--c-error);
+    }
+  }
+}

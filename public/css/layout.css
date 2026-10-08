@@ -1,0 +1,178 @@
+/* Seitenaufbau.
+
+   Vorgehen: mobile first. Die Grundregeln beschreiben das Smartphone im
+   Hochformat – alles untereinander. Ab Querformat mit genug Breite steht
+   das Brett links und die Karten rechts. Das deckt Desktop (ab 1024x768),
+   iPad quer und Smartphones quer mit einer einzigen Regel ab.
+
+   Die Brettgröße hängt an einer einzigen Variable (--board-size). Sie
+   wird je nach Format aus Breite oder Höhe des Bildschirms berechnet,
+   damit das Brett nie abgeschnitten wird und die Felder auf dem Handy
+   groß genug zum Antippen bleiben. */
+
+@layer layout {
+  /* Höhe der Kopfzeile, nötig für die Brettgröße im Querformat:
+     Innenabstand oben + Zeilenhöhe + Innenabstand unten. Die Zeile ist so
+     hoch wie der Zahnrad-Knopf (--touch); der Titel ist nie höher. */
+  :root {
+    --header-h: calc(var(--space-4) + var(--touch) + var(--space-3) + env(safe-area-inset-top));
+  }
+
+  .masthead {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: var(--space-3);
+    padding: calc(var(--space-4) + env(safe-area-inset-top)) var(--gutter) var(--space-3);
+  }
+
+  .masthead__brand {
+    grid-column: 2;
+    text-align: center;
+  }
+
+  .masthead__title {
+    font-size: var(--step-3);
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+
+  .masthead__settings {
+    grid-column: 3;
+    justify-self: end;
+  }
+
+  .screens {
+    flex: 1;
+    display: flex;
+    padding: 0 var(--gutter) var(--gutter);
+  }
+
+  .screen {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .screen--centered {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* --- Spielbildschirm: Smartphone hochkant (Grundfall) --------------- */
+  .game {
+    --frame: 0.75rem; /* Holzrahmen um das Brett */
+    --board-border: 2px; /* Linie direkt um die Felder, siehe board.css */
+    --coords-space: 0rem; /* Platz für A–H / 1–8, falls eingeschaltet */
+    --rail: 20rem; /* Breite der rechten Spalte im Querformat */
+
+    /* Alles, was zusätzlich zu den 8 Feldern Breite kostet. */
+    --board-extra: calc(2 * var(--frame) + 2 * var(--board-border) + var(--coords-space));
+    --board-size: min(
+      100vw - 2 * var(--gutter) - var(--board-extra) - env(safe-area-inset-left) -
+        env(safe-area-inset-right),
+      40rem
+    );
+    --table-width: calc(var(--board-size) + var(--board-extra));
+
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'status'
+      'table'
+      'details';
+    gap: var(--space-4);
+    justify-items: center;
+    align-content: start;
+  }
+
+  :root[data-coords='on'] .game {
+    --coords-space: 1.25rem;
+  }
+
+  .status {
+    grid-area: status;
+    width: min(100%, var(--table-width));
+  }
+  .table {
+    grid-area: table;
+  }
+  .details {
+    grid-area: details;
+    width: min(100%, var(--table-width));
+  }
+
+  /* --- Querformat mit genug Breite: Desktop, iPad quer, Handy quer ---- */
+  @media (orientation: landscape) and (min-width: 40rem) {
+    .game {
+      --board-size: min(
+        100dvh - var(--header-h) - 2 * var(--gutter) - var(--board-extra),
+        100vw - var(--rail) - 3 * var(--gutter) - var(--board-extra),
+        40rem
+      );
+      grid-template-columns: auto minmax(15rem, var(--rail));
+      grid-template-rows: auto 1fr;
+      grid-template-areas:
+        'table status'
+        'table details';
+      justify-content: center;
+      justify-items: stretch;
+      align-items: start;
+      column-gap: var(--gutter);
+      row-gap: var(--space-4);
+    }
+
+    .status,
+    .details {
+      width: auto;
+    }
+  }
+
+  /* --- Sehr flach (Handy quer): jeder Pixel fürs Brett --------------- */
+  @media (orientation: landscape) and (max-height: 32.5rem) {
+    :root {
+      --gutter: 0.625rem;
+    }
+
+    .masthead {
+      padding-block: calc(var(--space-2) + env(safe-area-inset-top)) var(--space-1);
+    }
+    .masthead__title {
+      font-size: var(--step-1);
+    }
+
+    /* Während der Partie verschwindet die Kopfzeile ganz. Die
+       Einstellungen sind dann über den Knopf in der Detailkarte
+       erreichbar. :has() spart hier eine Klasse, die das JavaScript
+       sonst bei jedem Bildschirmwechsel setzen müsste. */
+    body:has(#screen-game:not([hidden])) {
+      --header-h: 0rem;
+      & .masthead {
+        display: none;
+      }
+      & .screens {
+        padding-block-start: var(--gutter);
+      }
+    }
+
+    .card {
+      padding: var(--space-3);
+      gap: var(--space-2);
+    }
+
+    /* Anmelde- und Warte-Bildschirme dürfen scrollen statt zu quetschen. */
+    .screen--centered {
+      align-items: flex-start;
+    }
+  }
+
+  /* --- Schmale Hochformat-Bildschirme: kompakte Kopfzeile -------------
+     --header-h muss hier nicht angepasst werden: es zählt nur im
+     Querformat ab 40rem Breite. */
+  @media (max-width: 30rem) {
+    .masthead {
+      padding-block: calc(var(--space-3) + env(safe-area-inset-top)) var(--space-2);
+    }
+  }
+}

@@ -1,0 +1,5 @@
+# Zeilenenden immer LF, auch beim Auschecken unter Windows. Sonst meldet
+# "npm run format:check" (Prettier erwartet LF) jede Datei als falsch
+# formatiert.
+* text=auto eol=lf
+*.png binary

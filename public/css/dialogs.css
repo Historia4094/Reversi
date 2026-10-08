@@ -1,0 +1,298 @@
+@layer dialogs {
+  /* --- Einstellungsfenster -------------------------------------------
+     Desktop und Tablet: mittig. Smartphone: als Blatt von unten, weil man
+     dort mit dem Daumen bedient und die obere Hälfte schlecht erreicht. */
+  .sheet {
+    width: min(36rem, 100vw - 2 * var(--gutter));
+    max-height: min(88dvh, 50rem);
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-xl);
+    background: var(--c-panel);
+    color: var(--c-text);
+    box-shadow: 0 20px 60px rgb(0 0 0 / 35%);
+    overflow: hidden;
+
+    opacity: 1;
+    translate: 0 0;
+
+    /* Ein- und Ausblenden. display und overlay mit allow-discrete halten
+       das Fenster beim Schließen sichtbar, bis die Ausblendung fertig ist.
+       Browser ohne overlay (Firefox) überspringen nur diesen Teil; dort
+       kann die Ausblendung beim Schließen fehlen. */
+    transition:
+      opacity var(--fade) ease,
+      translate var(--fade) ease,
+      display var(--fade) allow-discrete,
+      overlay var(--fade) allow-discrete;
+
+    @starting-style {
+      opacity: 0;
+      translate: 0 var(--space-3);
+    }
+
+    &:not([open]) {
+      opacity: 0;
+      translate: 0 var(--space-3);
+    }
+
+    &::backdrop {
+      background: var(--c-backdrop);
+    }
+
+    @media (max-width: 37.5rem) {
+      width: 100%;
+      max-width: 100%;
+      max-height: 92dvh;
+      margin: 0;
+      margin-block-start: auto;
+      border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    }
+  }
+
+  .sheet__form {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    max-height: inherit;
+  }
+
+  .sheet__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding-block: var(--space-3) var(--space-2);
+    padding-inline: var(--space-5) var(--space-3);
+    border-block-end: 1px solid var(--c-line);
+  }
+
+  .sheet__title {
+    font-size: var(--step-1);
+    font-weight: 600;
+  }
+
+  .sheet__body {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: var(--space-4) var(--space-5) var(--space-5);
+    display: grid;
+    gap: var(--space-5);
+  }
+
+  .sheet__intro {
+    font-size: var(--step-minus-1);
+    color: var(--c-text-quiet);
+  }
+
+  .sheet__foot {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding-block: var(--space-3) calc(var(--space-3) + env(safe-area-inset-bottom));
+    padding-inline: var(--space-5);
+    border-block-start: 1px solid var(--c-line);
+    background: var(--c-panel);
+  }
+
+  /* --- Gruppen im Fenster -------------------------------------------- */
+  .group {
+    display: grid;
+    gap: var(--space-3);
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+  }
+
+  .group__title {
+    padding: 0;
+    margin-block-end: var(--space-1);
+    font-size: var(--step-minus-1);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--c-text-quiet);
+  }
+
+  .group__note {
+    font-size: var(--step-minus-1);
+    color: var(--c-text-quiet);
+  }
+
+  .group__warning {
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius);
+    background: color-mix(in oklab, var(--c-warn) 12%, white);
+    color: color-mix(in oklab, var(--c-warn) 80%, black);
+    font-size: var(--step-minus-1);
+  }
+
+  .stones {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .field--inline {
+    display: grid;
+    grid-template-columns: auto 1fr minmax(8rem, 12rem);
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  /* Ohne Stein-Vorschau (z. B. bei "Hinweise") rückt das Label nach vorn. */
+  .field--inline:not(:has(.stone-badge)) {
+    grid-template-columns: 1fr minmax(8rem, 12rem);
+  }
+
+  .field--inline .field__label {
+    margin: 0;
+    font-size: var(--step-0);
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--c-text);
+  }
+
+  @media (max-width: 26.25rem) {
+    .field--inline {
+      grid-template-columns: auto 1fr;
+    }
+    .field--inline:not(:has(.stone-badge)) {
+      grid-template-columns: 1fr;
+    }
+    .field--inline .field__select {
+      grid-column: 1 / -1;
+    }
+  }
+
+  /* --- Schalter ------------------------------------------------------- */
+  .toggle {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--space-3);
+    align-items: start;
+    cursor: pointer;
+
+    & input {
+      width: 1.25rem;
+      height: 1.25rem;
+      margin: 0;
+      margin-block-start: 0.15rem;
+      accent-color: var(--c-primary);
+    }
+  }
+
+  .toggle__text {
+    display: grid;
+    gap: 0.125rem;
+
+    & strong {
+      font-weight: 600;
+    }
+
+    & span {
+      font-size: var(--step-minus-1);
+      color: var(--c-text-quiet);
+    }
+  }
+
+  /* --- Auswahl als Segmente ------------------------------------------- */
+  .choice {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .choice__label {
+    width: 100%;
+    padding: 0;
+    margin-block-end: var(--space-1);
+  }
+
+  /* Das Optionsfeld liegt unsichtbar über der ganzen Fläche: so bleibt es
+     ein echtes <input type="radio"> (Tastatur, Screenreader), sieht aber
+     wie ein Segment aus. */
+  .choice__option {
+    position: relative;
+    flex: 1 1 auto;
+
+    & input {
+      position: absolute;
+      opacity: 0;
+      inset: 0;
+      margin: 0;
+      cursor: pointer;
+    }
+
+    & span {
+      display: block;
+      padding: var(--space-2) var(--space-3);
+      border: 1px solid var(--c-border);
+      border-radius: var(--radius);
+      text-align: center;
+      font-size: var(--step-minus-1);
+    }
+
+    &:has(input:checked) span {
+      border-color: var(--c-accent);
+      box-shadow: inset 0 0 0 1px var(--c-accent);
+      background: var(--c-highlight);
+      font-weight: 600;
+    }
+
+    &:has(input:focus-visible) span {
+      outline: 2px solid var(--c-accent);
+      outline-offset: 2px;
+    }
+  }
+
+  /* --- Ergebnis ------------------------------------------------------- */
+  .result {
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-lg);
+    background: var(--c-panel);
+    color: var(--c-text);
+    box-shadow: var(--shadow-panel);
+    width: min(25rem, 100vw - 2 * var(--gutter));
+    transition:
+      opacity var(--fade) ease,
+      scale var(--fade) ease;
+
+    @starting-style {
+      opacity: 0;
+      scale: 0.96;
+    }
+  }
+
+  /* Leichter Schleier: das Endbrett bleibt dahinter erkennbar. */
+  .result::backdrop {
+    background: color-mix(in oklab, var(--c-backdrop), transparent 10%);
+  }
+
+  .result__card {
+    padding: var(--space-6) var(--space-5);
+    text-align: center;
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .result__title {
+    font-size: var(--step-2);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  .result__reason {
+    color: var(--c-text);
+  }
+  .result__detail {
+    color: var(--c-text-quiet);
+  }
+
+  .result .button {
+    margin-block-start: var(--space-2);
+  }
+}

@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="de" data-board="felt">
+  <head>
+    <meta charset="utf-8" />
+    <!-- viewport-fit=cover: auf iPhones mit Notch nutzt die Seite den ganzen
+       Bildschirm; die Ränder werden im CSS über env(safe-area-inset-*)
+       freigehalten. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content="Reversi für zwei Spieler im Browser." />
+    <meta name="theme-color" content="#33463c" />
+    <title>Reversi</title>
+
+    <!-- Für "Zum Home-Bildschirm hinzufügen" auf Smartphone und Tablet -->
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Reversi" />
+
+    <!-- CSS bewusst nach Zuständigkeit getrennt statt in einer Datei.
+       Die Reihenfolge der Cascade Layers steht in tokens.css. -->
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/layout.css" />
+    <link rel="stylesheet" href="css/board.css" />
+    <link rel="stylesheet" href="css/components.css" />
+    <link rel="stylesheet" href="css/dialogs.css" />
+  </head>
+  <body>
+    <header class="masthead">
+      <div class="masthead__brand">
+        <h1 class="masthead__title">Reversi</h1>
+      </div>
+      <button type="button" class="icon-button masthead__settings" data-open-settings>
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22">
+          <path
+            fill="currentColor"
+            d="M19.4 13a7.5 7.5 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-1.7-1L15 3.5h-4l-.4 2.5a7.6 7.6 0 0 0-1.7 1l-2.4-1-2 3.4L6.6 11a7.5 7.5 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.6 7.6 0 0 0 1.7 1l.4 2.5h4l.4-2.5a7.6 7.6 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6ZM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Z"
+          />
+        </svg>
+        <span class="visually-hidden">Einstellungen</span>
+      </button>
+    </header>
+
+    <main class="screens">
+      <!-- Bildschirm 1: Anmeldung -->
+      <section id="screen-login" class="screen screen--centered" aria-labelledby="login-heading">
+        <div class="panel">
+          <h2 id="login-heading" class="panel__title">Anmelden</h2>
+          <p class="panel__text">
+            Sobald sich ein zweiter Spieler anmeldet, werdet ihr automatisch verbunden und die
+            Partie beginnt.
+          </p>
+          <form id="login-form" class="form" autocomplete="off">
+            <label class="field">
+              <span class="field__label">Dein Name</span>
+              <input
+                id="name-input"
+                class="field__input"
+                type="text"
+                name="name"
+                maxlength="20"
+                required
+                placeholder="z. B. Christa"
+                autocapitalize="words"
+                enterkeyhint="go"
+              />
+            </label>
+            <button type="submit" class="button button--primary">Weiter</button>
+          </form>
+          <p id="login-error" class="notice notice--error" role="alert" hidden></p>
+        </div>
+      </section>
+
+      <!-- Bildschirm 2: Brett wählen.
+         Reine Anzeigeeinstellung – sie geht nicht an den Server, weil sie
+         den Spielzustand nicht berührt. Dieselbe Einstellung steht auch im
+         Einstellungsfenster; settings.js hält beide synchron. -->
+      <section
+        id="screen-theme"
+        class="screen screen--centered"
+        aria-labelledby="theme-heading"
+        hidden
+      >
+        <div class="panel panel--wide">
+          <h2 id="theme-heading" class="panel__title">Wähle dein Brett</h2>
+          <p class="panel__text">
+            Die Auswahl gilt nur für deinen Bildschirm. Dein Gegner kann ein anderes Brett sehen und
+            spielt dieselbe Partie.
+          </p>
+
+          <fieldset class="themes">
+            <legend class="visually-hidden">Brett</legend>
+            <div class="themes__options">
+              <label class="theme">
+                <input
+                  class="visually-hidden"
+                  type="radio"
+                  name="board-start"
+                  value="felt"
+                  data-setting="board"
+                />
+                <span class="theme__preview" data-board="felt"></span>
+                <span class="theme__name">Filz</span>
+              </label>
+              <label class="theme">
+                <input
+                  class="visually-hidden"
+                  type="radio"
+                  name="board-start"
+                  value="wood"
+                  data-setting="board"
+                />
+                <span class="theme__preview" data-board="wood"></span>
+                <span class="theme__name">Holz</span>
+              </label>
+              <label class="theme">
+                <input
+                  class="visually-hidden"
+                  type="radio"
+                  name="board-start"
+                  value="marine"
+                  data-setting="board"
+                />
+                <span class="theme__preview" data-board="marine"></span>
+                <span class="theme__name">Marine</span>
+              </label>
+              <label class="theme">
+                <input
+                  class="visually-hidden"
+                  type="radio"
+                  name="board-start"
+                  value="contrast"
+                  data-setting="board"
+                />
+                <span class="theme__preview" data-board="contrast"></span>
+                <span class="theme__name">Kontrast</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <p class="panel__more">
+            <button type="button" class="link-button" data-open-settings>
+              Steinfarben, Symbole und Spielhilfen einstellen
+            </button>
+          </p>
+
+          <div class="panel__actions">
+            <button type="button" id="back-to-login" class="button button--quiet">Zurück</button>
+            <button type="button" id="start-search" class="button button--primary">
+              Spiel suchen
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Bildschirm 3: Wartebildschirm -->
+      <section
+        id="screen-waiting"
+        class="screen screen--centered"
+        aria-labelledby="waiting-heading"
+        hidden
+      >
+        <div class="panel panel--waiting">
+          <div class="pulse-disc" aria-hidden="true"></div>
+          <h2 id="waiting-heading" class="panel__title">Warten auf einen Gegner</h2>
+          <p class="panel__text">
+            Du bist angemeldet als <strong id="waiting-name">–</strong>. Der nächste Spieler, der
+            sich anmeldet, wird mit dir verbunden.
+          </p>
+          <!-- Bewusst ohne aria-live: Die Zeit ändert sich jede Sekunde,
+             ein Screenreader würde sonst ununterbrochen vorlesen. -->
+          <p class="panel__text panel__text--quiet" id="waiting-timer">Wartezeit 0:00</p>
+          <button type="button" id="cancel-waiting" class="button button--quiet">Abbrechen</button>
+        </div>
+      </section>
+
+      <!-- Bildschirm 4: Spiel.
+         Drei Bereiche: Spielstand, Brett, Details. Auf dem Smartphone
+         stehen sie untereinander (Spielstand über dem Brett, damit man
+         sieht, wer dran ist), auf breiten Bildschirmen steht das Brett
+         links und die beiden Karten rechts. -->
+      <section id="screen-game" class="screen game" aria-labelledby="game-heading" hidden>
+        <h2 id="game-heading" class="visually-hidden">Laufende Partie</h2>
+
+        <section class="card status" aria-label="Spielstand">
+          <div class="scoreline">
+            <div class="score" id="score-black">
+              <span class="stone-badge" data-side="black" aria-hidden="true"></span>
+              <span class="score__value" id="score-black-value">2</span>
+              <span class="score__name" id="score-black-name">Schwarz</span>
+            </div>
+            <div class="score" id="score-white">
+              <span class="stone-badge" data-side="white" aria-hidden="true"></span>
+              <span class="score__value" id="score-white-value">2</span>
+              <span class="score__name" id="score-white-name">Weiß</span>
+            </div>
+          </div>
+
+          <!-- Das Kräfteverhältnis als Balken. Die Zahlen stehen schon
+             darüber; der Balken zeigt die Verschiebung, die bei Reversi
+             mit jedem Zug passieren kann. Für Screenreader ausgeblendet,
+             weil er nichts sagt, was die Zahlen nicht schon sagen. -->
+          <div class="tally" aria-hidden="true">
+            <span class="tally__black" id="tally-black"></span>
+            <span class="tally__white"></span>
+          </div>
+
+          <p id="turn-indicator" class="turn" role="status">Schwarz beginnt.</p>
+
+          <div id="clock" class="clock" data-state="normal" hidden>
+            <div class="clock__row">
+              <span id="clock-label" class="clock__label">Bedenkzeit</span>
+              <span id="clock-time" class="clock__time">1:00</span>
+            </div>
+            <div class="clock__bar"><span id="clock-fill" class="clock__fill"></span></div>
+          </div>
+
+          <p id="hint" class="hint" aria-live="polite"></p>
+          <p id="strikes" class="strikes" hidden></p>
+        </section>
+
+        <div class="table">
+          <div class="coords coords--cols" aria-hidden="true">
+            <span>A</span>
+            <span>B</span>
+            <span>C</span>
+            <span>D</span>
+            <span>E</span>
+            <span>F</span>
+            <span>G</span>
+            <span>H</span>
+          </div>
+          <div class="coords coords--rows" aria-hidden="true">
+            <span>1</span>
+            <span>2</span>
+            <span>3</span>
+            <span>4</span>
+            <span>5</span>
+            <span>6</span>
+            <span>7</span>
+            <span>8</span>
+          </div>
+          <div id="board" class="board" role="group" aria-label="Spielbrett, 8 mal 8 Felder"></div>
+          <!-- Wichtige Ereignisse (Aussetzen, Zeitablauf) erscheinen hier,
+             direkt über dem Brett. role="alert": Screenreader lesen sie
+             sofort vor. Die Einblendung verschwindet nach ein paar Sekunden
+             von selbst; Antippen oder Escape schließt sie früher. -->
+          <p id="banner" class="banner" role="alert" hidden></p>
+        </div>
+
+        <section class="card details" aria-label="Partie">
+          <details class="log" open>
+            <summary>Zugverlauf</summary>
+            <p id="move-log-empty" class="log__empty">Noch keine Züge.</p>
+            <ol id="move-log" class="log__list"></ol>
+          </details>
+
+          <details class="rules">
+            <summary>Spielregeln</summary>
+            <ul class="rules__list">
+              <li>
+                Du legst einen Stein so, dass gegnerische Steine zwischen zwei deiner Steine
+                eingeschlossen sind – waagerecht, senkrecht oder diagonal. Alle eingeschlossenen
+                Steine werden umgedreht.
+              </li>
+              <li>Ein Zug ist nur erlaubt, wenn er mindestens einen Stein umdreht.</li>
+              <li>Hast du keinen erlaubten Zug, setzt du aus.</li>
+              <li>
+                Können beide nicht mehr ziehen, endet die Partie. Wer mehr Steine hat, gewinnt.
+              </li>
+              <li>Steine in den vier Ecken können nicht mehr gedreht werden.</li>
+              <li>
+                Pro Zug hast du <span data-turn-seconds>60</span> Sekunden. Läuft die Zeit ab, setzt
+                der Server zufällig einen erlaubten Stein für dich. Beim dritten Mal in Folge gilt
+                die Partie als aufgegeben.
+              </li>
+            </ul>
+          </details>
+
+          <div class="details__actions">
+            <button type="button" class="button button--quiet" data-open-settings>
+              Einstellungen
+            </button>
+            <button type="button" id="resign" class="button button--quiet" data-armed="false">
+              Aufgeben
+            </button>
+            <button type="button" id="new-game" class="button button--primary" hidden>
+              Neue Partie
+            </button>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <!-- Kurze Hinweise am Rand. role="status" ist von sich aus "polite":
+       Screenreader lesen sie vor, ohne den Spieler zu unterbrechen. -->
+    <div id="toasts" class="toasts" role="status"></div>
+
+    <!-- Einstellungen. <dialog> mit showModal() übernimmt Fokusführung,
+       Escape zum Schließen und das Sperren des Hintergrunds. -->
+    <dialog id="settings" class="sheet" aria-labelledby="settings-title">
+      <form method="dialog" class="sheet__form">
+        <header class="sheet__head">
+          <h2 id="settings-title" class="sheet__title">Einstellungen</h2>
+          <button type="submit" class="icon-button" aria-label="Einstellungen schließen">
+            <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20">
+              <path
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                d="M6 6l12 12M18 6 6 18"
+              />
+            </svg>
+          </button>
+        </header>
+
+        <div class="sheet__body">
+          <p class="sheet__intro">
+            Gilt nur für diesen Bildschirm und wird auf diesem Gerät gespeichert.
+          </p>
+
+          <fieldset class="group">
+            <legend class="group__title">Spielbrett</legend>
+            <div class="themes__options themes__options--compact">
+              <label class="theme">
+                <input
+                  class="visually-hidden"
+                  type="radio"
+                  name="board-dialog"
+                  value="felt"
+                  data-setting="board"
+                />
+                <span class="theme__preview" data-board="felt"></span>
+                <span class="theme__name">Filz</span>
+              </label>
+              <label class="theme">
+                <input
+                  class="visually-hidden"
+                  type="radio"
+                  name="board-dialog"
+                  value="wood"
+                  data-setting="board"
+                />
+                <span class="theme__preview" data-board="wood"></span>
+                <span class="theme__name">Holz</span>
+              </label>
+              <label class="theme">
+                <input
+                  class="visually-hidden"
+                  type="radio"
+                  name="board-dialog"
+                  value="marine"
+                  data-setting="board"
+                />
+                <span class="theme__preview" data-board="marine"></span>
+                <span class="theme__name">Marine</span>
+              </label>
+              <label class="theme">
+                <input
+                  class="visually-hidden"
+                  type="radio"
+                  name="board-dialog"
+                  value="contrast"
+                  data-setting="board"
+                />
+                <span class="theme__preview" data-board="contrast"></span>
+                <span class="theme__name">Kontrast</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset class="group">
+            <legend class="group__title">Steinfarben</legend>
+            <div class="stones">
+              <label class="field field--inline">
+                <span
+                  class="stone-badge stone-badge--preview"
+                  data-stone-preview="mine"
+                  data-side="black"
+                  aria-hidden="true"
+                ></span>
+                <span class="field__label">Deine Steine</span>
+                <select
+                  class="field__select"
+                  data-setting="stoneMine"
+                  data-options="stones"
+                ></select>
+              </label>
+              <label class="field field--inline">
+                <span
+                  class="stone-badge stone-badge--preview"
+                  data-stone-preview="opponent"
+                  data-side="white"
+                  aria-hidden="true"
+                ></span>
+                <span class="field__label">Steine des Gegners</span>
+                <select
+                  class="field__select"
+                  data-setting="stoneOpponent"
+                  data-options="stones"
+                ></select>
+              </label>
+            </div>
+            <p id="stone-warning" class="group__warning" role="status" hidden></p>
+            <p class="group__note">
+              Die Farben stammen aus einer Palette, die auch bei Farbsehschwäche unterscheidbar
+              bleibt. „Standard“ heißt: die übliche schwarze bzw. weiße Seite.
+            </p>
+          </fieldset>
+
+          <fieldset class="group">
+            <legend class="group__title">Barrierefreiheit</legend>
+            <label class="toggle">
+              <input type="checkbox" data-setting="symbols" />
+              <span class="toggle__text">
+                <strong>Symbole auf den Steinen</strong>
+                <span
+                  >Punkt für die schwarze Seite, Kreuz für die weiße. Hilft bei Farbsehschwäche –
+                  die Steine sind dann auch ohne Farbe unterscheidbar.</span
+                >
+              </span>
+            </label>
+            <label class="toggle">
+              <input type="checkbox" data-setting="reduceMotion" />
+              <span class="toggle__text">
+                <strong>Animationen reduzieren</strong>
+                <span>Steine wechseln sofort die Farbe, statt sich zu drehen.</span>
+              </span>
+            </label>
+          </fieldset>
+
+          <fieldset class="group">
+            <legend class="group__title">Spielhilfen</legend>
+
+            <fieldset class="choice">
+              <legend class="choice__label">Erlaubte Züge</legend>
+              <label class="choice__option">
+                <input type="radio" name="move-hints" value="rings" data-setting="moveHints" />
+                <span>Ringe</span>
+              </label>
+              <label class="choice__option">
+                <input type="radio" name="move-hints" value="counts" data-setting="moveHints" />
+                <span>Ringe mit Anzahl</span>
+              </label>
+              <label class="choice__option">
+                <input type="radio" name="move-hints" value="off" data-setting="moveHints" />
+                <span>Aus</span>
+              </label>
+            </fieldset>
+            <p class="group__note">
+              „Mit Anzahl“ zeigt, wie viele Steine der Zug umdrehen würde. Bei „Aus“ darfst du jedes
+              freie Feld antippen – der Server lehnt ungültige Züge ab.
+            </p>
+
+            <label class="toggle">
+              <input type="checkbox" data-setting="lastMove" />
+              <span class="toggle__text"><strong>Letzten Zug markieren</strong></span>
+            </label>
+            <label class="toggle">
+              <input type="checkbox" data-setting="coords" />
+              <span class="toggle__text"
+                ><strong>Koordinaten anzeigen</strong>
+                <span>A–H und 1–8 am Rand, passend zum Zugverlauf.</span></span
+              >
+            </label>
+
+            <label class="field field--inline">
+              <span class="field__label">Hinweise</span>
+              <select class="field__select" data-setting="notices">
+                <option value="all">Alle</option>
+                <option value="important">Nur wichtige</option>
+                <option value="warnings">Nur Warnungen</option>
+              </select>
+            </label>
+            <p class="group__note">
+              „Alle“ meldet auch gesicherte Ecken und große Züge. Warnungen zur eigenen Bedenkzeit
+              kommen immer.
+            </p>
+          </fieldset>
+        </div>
+
+        <footer class="sheet__foot">
+          <button type="button" id="settings-reset" class="button button--quiet">
+            Zurücksetzen
+          </button>
+          <button type="submit" class="button button--primary">Fertig</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <!-- Ergebnis. Liegt über dem Spiel, damit das Endbrett sichtbar bleibt.
+       Escape schließt es; danach führt "Neue Partie" unter dem Brett zurück. -->
+    <dialog id="result" class="result" aria-labelledby="result-title">
+      <div class="result__card">
+        <h2 id="result-title" class="result__title">Partie beendet</h2>
+        <p id="result-reason" class="result__reason"></p>
+        <p id="result-detail" class="result__detail"></p>
+        <button type="button" id="play-again" class="button button--primary">
+          Erneut anmelden
+        </button>
+      </div>
+    </dialog>
+
+    <!-- Vom Server ausgeliefert, sobald Socket.io läuft. -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>

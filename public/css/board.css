@@ -1,0 +1,283 @@
+@layer board {
+  /* --- Rahmen und Koordinaten ---------------------------------------
+     Das Brett sitzt in einem Raster mit einer schmalen Spalte links
+     (1–8) und einer Zeile oben (A–H). Sind die Koordinaten aus, bleiben
+     diese Spuren leer und fallen auf 0 zusammen. */
+  .table {
+    display: grid;
+    grid-template-columns: auto auto;
+    grid-template-areas:
+      '.    cols'
+      'rows board';
+    padding: var(--frame);
+    background: linear-gradient(180deg, var(--c-frame-top), var(--c-frame-bottom));
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-panel);
+  }
+
+  .coords {
+    display: none;
+    font-family: var(--font-num);
+    font-size: var(--step-minus-2);
+    color: var(--c-marker-soft);
+    user-select: none;
+  }
+
+  :root[data-coords='on'] .coords {
+    display: grid;
+  }
+
+  .coords--cols {
+    grid-area: cols;
+    grid-template-columns: repeat(8, 1fr);
+    text-align: center;
+    block-size: var(--coords-space);
+    align-items: center;
+  }
+
+  .coords--rows {
+    grid-area: rows;
+    grid-template-rows: repeat(8, 1fr);
+    inline-size: var(--coords-space);
+    align-items: center;
+    text-align: center;
+  }
+
+  .board {
+    --cell: calc(var(--board-size, 30rem) / 8);
+
+    grid-area: board;
+    display: grid;
+    grid-template-columns: repeat(8, var(--cell));
+    grid-template-rows: repeat(8, var(--cell));
+    background: var(--c-felt);
+    /* Breite steht in layout.css, weil sie in die Brettgröße eingeht. */
+    border: var(--board-border, 2px) solid var(--c-felt-line);
+    /* Damit die Drehung räumlich wirkt und nicht wie ein Aufblenden. */
+    perspective: 900px;
+    /* Langes Drücken auf dem Handy soll kein Kontextmenü und keine
+       Textauswahl auslösen. */
+    user-select: none;
+    /* Ältere Safari-Versionen kennen user-select nur mit Präfix;
+       touch-callout (Vorschau-Menü bei langem Drücken) gibt es nur in
+       Safari. */
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  /* --- Felder --------------------------------------------------------
+     Die Gitterlinien sind ein Innenschatten rechts und unten an jedem
+     Feld. Lücken zwischen den Feldern (gap) wären eleganter, verschwinden
+     aber bei manchen Brettgrößen, weil der Browser die Feldbreite auf
+     ganze Pixel rundet. Ein Innenschatten wird nicht weggerundet.
+
+     Markierungen (letzter Zug) hängen sich über --cell-mark an denselben
+     Schatten an, statt ihn zu überschreiben. */
+  .cell {
+    all: unset;
+    --cell-mark: 0 0 transparent;
+    position: relative;
+    display: grid;
+    place-items: center;
+    aspect-ratio: 1;
+    background: var(--c-felt);
+    box-shadow:
+      inset -1px -1px 0 var(--c-felt-line),
+      var(--cell-mark);
+    cursor: default;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Nur erlaubte Felder reagieren. Die Liste kommt vom Server. */
+  .cell:not(:disabled) {
+    cursor: pointer;
+  }
+
+  .cell:focus-visible {
+    outline: 2px solid var(--c-marker-soft);
+    outline-offset: -3px;
+  }
+
+  /* Ringe für erlaubte Züge. Alle Regeln für die Ringe beginnen mit
+     demselben :root-Teil, damit Hover und Fokus unten dieselbe
+     Spezifität haben und die Grundregel zuverlässig überschreiben. */
+  :root:not([data-move-hints='off']) .cell[data-legal='true']::after {
+    content: '';
+    display: grid;
+    place-items: center;
+    width: 36%;
+    aspect-ratio: 1;
+    border: 2px solid var(--c-marker);
+    border-radius: 50%;
+    opacity: 0.9;
+    transition:
+      opacity var(--fade) ease,
+      scale var(--fade) ease;
+  }
+
+  /* Ringe mit Anzahl: wie viele Steine dieser Zug umdrehen würde. */
+  :root[data-move-hints='counts'] .cell[data-legal='true']::after {
+    content: attr(data-flips);
+    width: 46%;
+    font-family: var(--font-num);
+    font-size: calc(var(--cell) * 0.28);
+    font-weight: 600;
+    line-height: 1;
+    color: var(--c-marker);
+  }
+
+  /* Hover nur dort, wo es eine Maus gibt – auf Touch-Geräten bliebe der
+     Zustand sonst nach dem Antippen hängen. */
+  @media (hover: hover) {
+    :root:not([data-move-hints='off']) .cell[data-legal='true']:hover::after {
+      opacity: 1;
+      scale: 1.15;
+    }
+
+    :root[data-move-hints='off'] .cell:not(:disabled):hover {
+      background: color-mix(in oklab, var(--c-felt) 88%, white);
+    }
+  }
+
+  :root:not([data-move-hints='off']) .cell[data-legal='true']:focus-visible::after {
+    opacity: 1;
+    scale: 1.15;
+  }
+
+  /* Der zuletzt gesetzte Stein bekommt einen Rahmen, damit man den Zug
+     des Gegners findet. */
+  :root:not([data-last-move='off']) .cell[data-last='true'] {
+    --cell-mark: inset 0 0 0 2px var(--c-marker-soft);
+  }
+
+  /* --- Eckenmarkierung ----------------------------------------------
+     Die vier Ecken sind die einzigen Felder, deren Steine nie wieder
+     gedreht werden können. Ein kleiner Punkt am äußeren Rand weist
+     darauf hin, ohne mit den Ringen der erlaubten Züge verwechselt zu
+     werden: die sitzen mittig, diese am Rand. */
+  .cell:nth-child(1)::before,
+  .cell:nth-child(8)::before,
+  .cell:nth-child(57)::before,
+  .cell:nth-child(64)::before {
+    content: '';
+    position: absolute;
+    width: max(0.3rem, calc(var(--cell) * 0.1));
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: color-mix(in oklab, var(--c-marker-soft) 70%, transparent);
+  }
+
+  .cell:nth-child(1)::before {
+    inset-block-start: var(--space-1);
+    inset-inline-start: var(--space-1);
+  }
+  .cell:nth-child(8)::before {
+    inset-block-start: var(--space-1);
+    inset-inline-end: var(--space-1);
+  }
+  .cell:nth-child(57)::before {
+    inset-block-end: var(--space-1);
+    inset-inline-start: var(--space-1);
+  }
+  .cell:nth-child(64)::before {
+    inset-block-end: var(--space-1);
+    inset-inline-end: var(--space-1);
+  }
+
+  /* --- Der Stein ---------------------------------------------------
+     Ein Stein hat zwei Seiten. Deshalb wird er nicht umgefärbt,
+     sondern gedreht: zwei Flächen im Raum, die Rückseite ist
+     ausgeblendet. Die Drehung fällt allein durch den Wechsel von
+     data-color an, ohne zusätzliche Animationslogik im JavaScript. */
+  .disc {
+    position: relative;
+    width: 78%;
+    aspect-ratio: 1;
+    transform-style: preserve-3d;
+    transition: transform var(--flip-duration) var(--ease-flip);
+    /* Wird pro Feld von board.js gesetzt: je weiter vom gesetzten Stein
+       entfernt, desto später dreht er. Die Kette kippt dadurch sichtbar
+       vom Zug nach außen weg. */
+    transition-delay: calc(var(--flip-index, 0) * var(--flip-stagger));
+  }
+
+  .disc[data-color='black'] {
+    transform: rotateY(0deg);
+  }
+  .disc[data-color='white'] {
+    transform: rotateY(180deg);
+  }
+
+  .disc__face {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    backface-visibility: hidden;
+    /* Feiner Rand: hebt auch farbige Steine vom Brett ab, deren Farbe
+       dem Brett ähnelt (z. B. Blaugrün auf Filz). */
+    box-shadow:
+      inset 0 0 0 1px rgb(0 0 0 / 28%),
+      var(--shadow-disc);
+  }
+
+  .disc__face--black {
+    background: radial-gradient(
+      circle at 34% 28%,
+      var(--stone-b-hi),
+      var(--stone-b) 55%,
+      var(--stone-b-lo)
+    );
+  }
+
+  .disc__face--white {
+    background: radial-gradient(
+      circle at 34% 28%,
+      var(--stone-w-hi),
+      var(--stone-w) 55%,
+      var(--stone-w-lo)
+    );
+    transform: rotateY(180deg);
+  }
+
+  /* Frisch gesetzte Steine werden gelegt, nicht gedreht. */
+  .disc[data-placed='true'] {
+    transition: none;
+    animation: place calc(220ms * var(--motion)) var(--ease-flip);
+  }
+
+  @keyframes place {
+    from {
+      scale: 0.4;
+      opacity: 0;
+    }
+    to {
+      scale: 1;
+      opacity: 1;
+    }
+  }
+}
+
+@layer board {
+  /* --- Symbole auf den Steinen (Farbenblind-Modus) -------------------
+     Die Seite ist dann nicht nur an der Farbe erkennbar, sondern auch an
+     der Form: Punkt = schwarze Seite, Kreuz = weiße Seite. Die Symbole
+     gelten auch für die Anzeige im Punktestand und im Zugverlauf. */
+  :root[data-symbols='on'] :is(.disc__face--black, .stone-badge[data-side='black'])::after {
+    content: '';
+    width: 30%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: var(--stone-b-mark);
+  }
+
+  :root[data-symbols='on'] :is(.disc__face--white, .stone-badge[data-side='white'])::after {
+    content: '';
+    width: 42%;
+    aspect-ratio: 1;
+    background:
+      linear-gradient(45deg, transparent 41%, var(--stone-w-mark) 41% 59%, transparent 59%),
+      linear-gradient(-45deg, transparent 41%, var(--stone-w-mark) 41% 59%, transparent 59%);
+  }
+}

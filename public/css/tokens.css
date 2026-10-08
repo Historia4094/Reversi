@@ -1,0 +1,172 @@
+/* Design-Tokens, Layer-Reihenfolge und Brettvarianten.
+
+   Die Cascade Layers legen die Reihenfolge einmal zentral fest. Deshalb
+   muss tokens.css als erste Datei geladen werden (siehe index.html);
+   danach ist die Reihenfolge der übrigen Dateien egal, und Regeln können
+   sich nicht überraschend gegenseitig überschreiben.
+
+   Einheiten: rem für Schriftgrößen, Abstände, Radien und Größen, auch in
+   Medien- und Container-Abfragen. px nur für Linienstärken (1–2px),
+   Schatten und die 3D-Perspektive – Werte, die nicht mit der Schriftgröße
+   wachsen sollen. */
+@layer tokens, base, layout, board, components, dialogs;
+
+@layer tokens {
+  :root {
+    /* --- Übriges Farbschema ----------------------------------------- */
+    --c-table: #b8bfb2;
+    --c-table-deep: #a4ac9d;
+    --c-panel: #f2efe6;
+    --c-panel-sunk: #e9e5d8;
+    --c-panel-raised: #fbf9f4; /* Hinweise am Rand */
+    --c-highlight: #fffdf6; /* ausgewählte Karte, wer am Zug ist */
+    --c-field: #fff; /* Eingabefelder */
+    --c-border: #c6c1b2; /* Rahmen von Feldern und leisen Knöpfen */
+    --c-line: #d8d3c4; /* Trennlinien */
+    --c-accent: #b07c2a; /* Fokus, aktive Auswahl */
+    --c-primary: #33463c; /* Hauptknopf */
+    --c-text: #1b211c;
+    --c-text-quiet: #4e574e;
+    --c-error: #8c3320;
+    --c-warn: #9a5b00;
+    --c-good: #2f6b3f;
+
+    /* Einblendung über dem Brett: dunkel, mit farbigem Ring je Ton. Die
+       Ringe sind hellere Fassungen von Fehler, Warnung und Erfolg, weil
+       sie auf dunklem Grund stehen. */
+    --c-overlay: rgb(20 24 21 / 90%);
+    --c-on-overlay: var(--c-panel-raised);
+    --c-ring-bad: #e0806a;
+    --c-ring-warn: #e3b45a;
+    --c-ring-good: #8cc49a;
+    --c-backdrop: rgb(26 30 27 / 50%);
+
+    /* Typografie. Bewusst nur Systemschriften: das Projekt muss auf
+       einem fremden Rechner ohne Netzzugang laufen. */
+    --font-ui: ui-sans-serif, system-ui, 'Segoe UI', roboto, helvetica, arial, sans-serif;
+    --font-num: ui-monospace, 'SF Mono', 'Cascadia Mono', menlo, consolas, monospace;
+    --step-minus-2: 0.75rem;
+    --step-minus-1: 0.8125rem;
+    --step-0: 1rem;
+    --step-1: 1.25rem;
+    --step-2: 1.75rem;
+    --step-3: clamp(1.75rem, 4vw, 2.75rem);
+
+    /* Abstände in einer 4px-Skala (bei 16px Grundschrift). */
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-5: 1.5rem;
+    --space-6: 2rem;
+
+    /* Seitenrand: auf dem Smartphone schmal, sonst großzügig. Notch und
+       Home-Leiste hält body über env(safe-area-inset-*) frei. */
+    --gutter: clamp(0.75rem, 3vw, 2rem);
+
+    /* Mindestgröße für alles, was man antippt (Knöpfe, Felder). */
+    --touch: 2.75rem;
+
+    --radius: 0.25rem;
+    --radius-lg: 0.5rem;
+    --radius-xl: 0.75rem;
+    --radius-round: 999px;
+    --shadow-panel: 0 1px 2px rgb(0 0 0 / 12%), 0 8px 24px rgb(0 0 0 / 10%);
+    --shadow-disc: 0 1px 2px rgb(0 0 0 / 45%);
+    --shadow-float: 0 8px 30px rgb(0 0 0 / 35%);
+
+    /* Bewegung. Alle Dauern hängen an --motion: 1 = normal, 0 = aus.
+       Damit reichen eine Zeile für "Animationen reduzieren" und eine für
+       die Systemeinstellung – ohne !important und ohne jede Animation
+       einzeln abzuschalten. */
+    --motion: 1;
+    --flip-duration: calc(420ms * var(--motion));
+    --flip-stagger: calc(55ms * var(--motion));
+    --ease-flip: cubic-bezier(0.32, 0.72, 0.3, 1);
+    --fade: calc(180ms * var(--motion));
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :root {
+      --motion: 0;
+    }
+  }
+
+  :root[data-motion='reduced'] {
+    --motion: 0;
+  }
+
+  /* --- Brettvarianten ------------------------------------------------
+     settings.js setzt data-board am <html>-Element. Jede Variante setzt
+     nur die Brett-Tokens. Die Selektoren gelten bewusst für jedes Element
+     mit data-board, nicht nur für <html>: Die kleinen Vorschaubretter in
+     der Brettauswahl tragen dasselbe Attribut und zeigen dadurch ihre
+     eigenen Farben, ohne dass sie ein zweites Mal im CSS stehen. */
+  :root,
+  [data-board='felt'] {
+    --c-felt: #33463c; /* Spielfläche */
+    --c-felt-line: #22302a; /* Gitterlinien */
+    --c-ink: #1a1e1b; /* Standardfarbe der schwarzen Seite */
+    --c-bone: #f2efe6; /* Standardfarbe der weißen Seite */
+    --c-frame-top: #6d5a3e; /* Rahmen um das Brett */
+    --c-frame-bottom: #55452e;
+    --c-marker: #b07c2a; /* Ringe für erlaubte Züge */
+    --c-marker-soft: #d8b273; /* letzter Zug, Eckpunkte, Koordinaten */
+  }
+
+  [data-board='wood'] {
+    --c-felt: #b98b57;
+    --c-felt-line: #4a3118;
+    --c-ink: #241c14;
+    --c-bone: #faf5e9;
+    --c-frame-top: #5c4630;
+    --c-frame-bottom: #45341f;
+
+    /* Auf hellem Holz geht helles Messing unter, deshalb dunkle Bronze. */
+    --c-marker: #5f3f0f;
+    --c-marker-soft: #7a531a;
+  }
+
+  [data-board='marine'] {
+    --c-felt: #1f4e63;
+    --c-felt-line: #133444;
+    --c-ink: #121a1f;
+    --c-bone: #f4f1ea;
+    --c-frame-top: #3b4650;
+    --c-frame-bottom: #2a333b;
+    --c-marker: #e3b45a;
+    --c-marker-soft: #f0cf8a;
+  }
+
+  /* Erhöhte Unterscheidbarkeit: reines Schwarz gegen reines Weiß auf
+     mittlerem Grau, damit beide Steinfarben deutlich gegen das Brett
+     stehen und nicht nur gegeneinander. */
+  [data-board='contrast'] {
+    --c-felt: #4d5358;
+    --c-felt-line: #23272a;
+    --c-ink: #000;
+    --c-bone: #fff;
+    --c-frame-top: #2b2f32;
+    --c-frame-bottom: #1c1f21;
+    --c-marker: #ffc043;
+    --c-marker-soft: #ffd67d;
+  }
+
+  /* --- Steine ---------------------------------------------------------
+     Eigene Farben aus den Einstellungen setzt settings.js als
+     --user-stone-b / --user-stone-w. Fehlen sie, gilt die Brettfarbe.
+     Glanzlicht und Schattenseite werden per color-mix() aus der
+     Grundfarbe abgeleitet – so funktioniert jede Farbe, ohne dass für
+     jede ein eigener Verlauf gepflegt werden muss. Steht nach den
+     Brettvarianten, weil es deren --c-ink und --c-bone verwendet. */
+  :root {
+    --stone-b: var(--user-stone-b, var(--c-ink));
+    --stone-w: var(--user-stone-w, var(--c-bone));
+    --stone-b-hi: color-mix(in oklab, var(--stone-b) 78%, white);
+    --stone-b-lo: color-mix(in oklab, var(--stone-b) 80%, black);
+    --stone-w-hi: color-mix(in oklab, var(--stone-w) 70%, white);
+    --stone-w-lo: color-mix(in oklab, var(--stone-w) 86%, black);
+    --stone-b-mark: var(--user-mark-b, var(--c-bone));
+    --stone-w-mark: var(--user-mark-w, var(--c-ink));
+  }
+}
