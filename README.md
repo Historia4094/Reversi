@@ -233,3 +233,7 @@ Die Bedenkzeit, das Aufgeben und die Spielhilfen (Zugvorschau, Eckenmarkierung) 
 
 - In Firefox und Safari ist das Spiel noch nicht getestet.
 - Auf sehr schmalen Smartphones (360 px) sind die Brettfelder gut 40 px groß statt 44 px. Für 44 px fehlen dort etwa 30 px, die nur ohne Seitenrand und Rahmen frei würden. 40 px liegen über den 24 px, die WCAG 2.2 (2.5.8) mindestens verlangt.
+
+## Online spielen
+
+Das Spiel läuft unter http://s252549-at-student-dhbw-mannheim-de.users.dhbw.site/ (IPv6 nötig).
