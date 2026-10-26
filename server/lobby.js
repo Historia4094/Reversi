@@ -10,7 +10,7 @@
  * legt index.js über die Fabrikfunktion createMatch fest.
  */
 
-import { BLACK, WHITE } from './game.js';
+import { BLACK, WHITE, opponentOf } from './game.js';
 import { Match } from './match.js';
 
 let nextMatchId = 1;
@@ -93,7 +93,7 @@ export class Lobby {
   opponentIn(match, playerId) {
     const color = this.colorOf(match, playerId);
     if (color === null) return null;
-    return match.players[color === BLACK ? WHITE : BLACK];
+    return match.players[opponentOf(color)];
   }
 
   /**

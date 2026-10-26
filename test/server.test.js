@@ -1,109 +1,33 @@
 /**
- * Integrationstest. Startet den echten Server als eigenen Prozess und
- * verbindet zwei echte Socket.io-Clients. Damit ist geprüft, was der
- * Dozent am Spieltag tut, nicht nur die Regellogik.
+ * Integrationstest. Startet den echten Server auf einem echten Port und
+ * verbindet echte Socket.io-Clients. Damit ist geprüft, was der Dozent
+ * am Spieltag tut, nicht nur die Regellogik.
+ *
+ * Der Server läuft im Testprozess (test/helpers/net.js), damit er in der
+ * Testabdeckung erscheint. Den Start über server/index.js prüft
+ * test/start.test.js.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-import { io as ioClient } from 'socket.io-client';
+import * as net from './helpers/net.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.join(__dirname, '..');
-const PORT = 4321;
-const URL = `http://127.0.0.1:${PORT}`;
+const { once, connected, stateWhere } = net;
 
 const BLACK = 1;
 const WHITE = 2;
 
-let serverProcess;
+let url;
+let game;
 
-/** Wartet auf ein einzelnes Ereignis eines Sockets. */
-function once(socket, event, timeout = 5000) {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`Timeout bei "${event}"`)), timeout);
-    socket.once(event, (payload) => {
-      clearTimeout(timer);
-      resolve(payload);
-    });
-  });
-}
-
-/**
- * Wartet, bis der Socket verbunden ist. Ein einfaches once('connect')
- * reicht nicht: ist die Verbindung schon aufgebaut, wenn der Listener
- * gesetzt wird, kommt das Ereignis nie wieder.
- */
-function connected(socket) {
-  if (socket.connected) return Promise.resolve();
-  return once(socket, 'connect');
-}
-
-/** Wartet auf einen Zustand, der die Bedingung erfüllt. */
-function stateWhere(socket, predicate, timeout = 5000) {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('Timeout: kein passender Zustand')), timeout);
-    const listener = (state) => {
-      if (!predicate(state)) return;
-      clearTimeout(timer);
-      socket.off('state', listener);
-      resolve(state);
-    };
-    socket.on('state', listener);
-  });
-}
-
-function newClient() {
-  return ioClient(URL, { transports: ['websocket'], forceNew: true });
-}
-
-/**
- * Baut eine laufende Partie auf und liefert beide Sockets samt
- * Startzustand. Schwarz ist der Spieler, der zuerst gewartet hat.
- */
-async function startMatch(t, nameA = 'Anna', nameB = 'Bruno') {
-  const black = newClient();
-  const white = newClient();
-  t.after(() => {
-    black.disconnect();
-    white.disconnect();
-  });
-
-  await connected(black);
-  black.emit('join', { name: nameA });
-  await once(black, 'waiting');
-
-  await connected(white);
-  const startBlack = once(black, 'gameStart');
-  white.emit('join', { name: nameB });
-  const whiteStart = await once(white, 'gameStart');
-  const blackStart = await startBlack;
-
-  return { black, white, blackStart, whiteStart };
-}
+const newClient = () => net.newClient(url);
+const startMatch = (t, nameA, nameB) => net.startMatch(t, url, nameA, nameB);
 
 test.before(async () => {
-  serverProcess = spawn('node', ['server/index.js', String(PORT)], {
-    cwd: ROOT,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  await new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('Server startet nicht')), 8000);
-    serverProcess.stdout.on('data', (chunk) => {
-      if (String(chunk).includes('läuft auf')) {
-        clearTimeout(timer);
-        resolve();
-      }
-    });
-  });
+  ({ url, game } = await net.startServer());
 });
 
-test.after(() => {
-  serverProcess?.kill();
-});
+test.after(() => game.close());
 
 test('Die Suchnummer kommt in waiting und gameStart unverändert zurück', async (t) => {
   const black = newClient();
@@ -262,7 +186,9 @@ test('Eine vollständige Partie läuft bis zum Ergebnis durch', async (t) => {
     sockets[color].on('state', (state) => {
       if (state.finished || !state.yourTurn) return;
       const move = state.legalMoves[Math.floor(Math.random() * state.legalMoves.length)];
-      sockets[color].emit('move', { row: move.row, col: move.col });
+      // Kurze Pause wie bei einem Menschen: Ohne sie schickte jede Seite
+      // rund 30 Züge in wenigen Millisekunden und liefe in den Flutschutz.
+      setTimeout(() => sockets[color].emit('move', { row: move.row, col: move.col }), 60);
     });
   }
 

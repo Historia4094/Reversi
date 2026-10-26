@@ -91,6 +91,16 @@
     --coords-space: 1.25rem;
   }
 
+  /* Schmale Smartphones: schmalerer Rahmen, damit die Felder 44 px
+     erreichen. Bei 390 px Breite werden es 44,25 px. Darunter (360 px)
+     reicht der Platz nur ohne Seitenrand und Rahmen; dort bleiben es gut
+     40 px – über der Mindestgröße von 24 px aus WCAG 2.2 (2.5.8). */
+  @media (width <= 25rem) {
+    .game {
+      --frame: 0.25rem;
+    }
+  }
+
   .status {
     grid-area: status;
     width: min(100%, var(--table-width));
@@ -104,7 +114,7 @@
   }
 
   /* --- Querformat mit genug Breite: Desktop, iPad quer, Handy quer ---- */
-  @media (orientation: landscape) and (min-width: 40rem) {
+  @media (orientation: landscape) and (width >= 40rem) {
     .game {
       --board-size: min(
         100dvh - var(--header-h) - 2 * var(--gutter) - var(--board-extra),
@@ -130,7 +140,7 @@
   }
 
   /* --- Sehr flach (Handy quer): jeder Pixel fürs Brett --------------- */
-  @media (orientation: landscape) and (max-height: 32.5rem) {
+  @media (orientation: landscape) and (height <= 32.5rem) {
     :root {
       --gutter: 0.625rem;
     }
@@ -170,7 +180,7 @@
   /* --- Schmale Hochformat-Bildschirme: kompakte Kopfzeile -------------
      --header-h muss hier nicht angepasst werden: es zählt nur im
      Querformat ab 40rem Breite. */
-  @media (max-width: 30rem) {
+  @media (width <= 30rem) {
     .masthead {
       padding-block: calc(var(--space-3) + env(safe-area-inset-top)) var(--space-2);
     }

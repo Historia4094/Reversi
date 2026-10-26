@@ -27,6 +27,12 @@ export default [
     languageOptions: { globals: globals.node },
   },
   {
+    // Client-Tests laufen unter Node, bekommen aber über test/helpers/dom.js
+    // (jsdom) die Browser-Namen document und window.
+    files: ['test/**/*.js'],
+    languageOptions: { globals: { document: 'readonly', window: 'readonly' } },
+  },
+  {
     rules: {
       // Häufige Fehlerquellen, die "recommended" nicht abdeckt.
       eqeqeq: ['error', 'always'],

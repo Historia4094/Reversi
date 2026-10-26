@@ -62,3 +62,14 @@ test('Nach dem Ende geht es mit "Neue Partie" in eine neue Suche', () => {
   flow.reset();
   assert.equal(flow.startSearch(), 2);
 });
+
+test('searching gilt nur während der Suche', () => {
+  const flow = new Flow();
+  assert.equal(flow.searching, false);
+  const ticket = flow.startSearch();
+  assert.equal(flow.searching, true);
+  flow.beginGame(ticket);
+  assert.equal(flow.searching, false);
+  assert.equal(flow.endGame(), true);
+  assert.equal(flow.endGame(), false, 'zweites Ende zählt nicht');
+});

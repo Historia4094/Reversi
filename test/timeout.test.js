@@ -1,76 +1,29 @@
 /**
  * Zeitablauf und Aufgeben über das echte Netzwerk.
  *
- * Eigener Serverprozess mit sehr kurzer Bedenkzeit (TURN_SECONDS=0.4),
- * damit der Test nicht Minuten dauert.
+ * Eigener Server mit sehr kurzer Bedenkzeit (0,4 s), damit der Test nicht
+ * Minuten dauert.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-import { io as ioClient } from 'socket.io-client';
+import * as net from './helpers/net.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.join(__dirname, '..');
-const PORT = 4322;
-const URL = `http://127.0.0.1:${PORT}`;
+const { once } = net;
+
 const BLACK = 1;
 const WHITE = 2;
 
-let serverProcess;
+let url;
+let game;
 
-function once(socket, event, timeout = 6000) {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`Timeout bei "${event}"`)), timeout);
-    socket.once(event, (payload) => {
-      clearTimeout(timer);
-      resolve(payload);
-    });
-  });
-}
-
-function connected(socket) {
-  return socket.connected ? Promise.resolve() : once(socket, 'connect');
-}
-
-async function startMatch(t) {
-  const black = ioClient(URL, { transports: ['websocket'], forceNew: true });
-  const white = ioClient(URL, { transports: ['websocket'], forceNew: true });
-  t.after(() => {
-    black.disconnect();
-    white.disconnect();
-  });
-
-  await connected(black);
-  black.emit('join', { name: 'Anna' });
-  await once(black, 'waiting');
-  await connected(white);
-  const blackStart = once(black, 'gameStart');
-  white.emit('join', { name: 'Bruno' });
-  const whiteStart = await once(white, 'gameStart');
-  return { black, white, blackStart: await blackStart, whiteStart };
-}
+const startMatch = (t) => net.startMatch(t, url);
 
 test.before(async () => {
-  serverProcess = spawn('node', ['server/index.js', String(PORT)], {
-    cwd: ROOT,
-    env: { ...process.env, TURN_SECONDS: '0.4' },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  await new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('Server startet nicht')), 8000);
-    serverProcess.stdout.on('data', (chunk) => {
-      if (String(chunk).includes('läuft auf')) {
-        clearTimeout(timer);
-        resolve();
-      }
-    });
-  });
+  ({ url, game } = await net.startServer({ turnMs: 400 }));
 });
 
-test.after(() => serverProcess?.kill());
+test.after(() => game.close());
 
 test('Der Zustand enthält Bedenkzeit und Restzeit', async (t) => {
   const { blackStart } = await startMatch(t);

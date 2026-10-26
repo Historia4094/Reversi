@@ -105,8 +105,10 @@ export class Match {
 
     const result = this.game.playRandom(color, this.random);
     if (!result.ok) {
-      // Kann nach den Regeln nicht passieren: am Zug ist immer nur, wer
-      // einen erlaubten Zug hat. Trotzdem nicht abstürzen.
+      // Kann nach den Regeln nicht passieren: Am Zug ist immer nur, wer
+      // einen erlaubten Zug hat (game.js lässt sonst aussetzen). Der Zweig
+      // ist eine Absicherung, damit ein Fehler dort den Server nicht
+      // anhält; test/match.test.js löst ihn mit einer Attrappe aus.
       console.error(`Partie ${this.id}: kein Ersatzzug möglich.`);
       this.armClock();
       return;

@@ -12,11 +12,12 @@
  * Brett: 8x8 Array of Array, jede Zelle EMPTY | BLACK | WHITE.
  */
 
-export const EMPTY = 0;
-export const BLACK = 1;
-export const WHITE = 2;
+import { EMPTY, BLACK, WHITE, SIZE, opponentOf } from '../public/shared/constants.js';
 
-export const SIZE = 8;
+// Die Konstanten stehen in public/shared/constants.js, damit Server und
+// Client dieselben Werte verwenden. Hier nur weitergereicht, damit die
+// übrigen Server-Module sie wie bisher aus game.js beziehen.
+export { EMPTY, BLACK, WHITE, SIZE, opponentOf };
 
 /** Die acht Richtungen als [dRow, dCol]. */
 const DIRECTIONS = [
@@ -38,10 +39,6 @@ export const END = Object.freeze({
   RESIGN: 'resign', // ein Spieler hat aufgegeben
   INACTIVE: 'inactive', // ein Spieler hat zu oft nicht gezogen
 });
-
-export function opponentOf(player) {
-  return player === BLACK ? WHITE : BLACK;
-}
 
 export function isCorner(row, col) {
   return (row === 0 || row === SIZE - 1) && (col === 0 || col === SIZE - 1);

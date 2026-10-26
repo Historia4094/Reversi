@@ -167,3 +167,31 @@ test('Direkt nach start() ist die volle Bedenkzeit übrig', (t) => {
   match.start();
   assert.ok(match.viewFor(BLACK).remainingMs > 59_000);
 });
+
+test('Absicherung: Findet der Server keinen Ersatzzug, läuft die Uhr neu, statt abzustürzen', (t) => {
+  const { match, changes } = newMatch();
+  t.after(() => match.dispose());
+  const error = t.mock.method(console, 'error', () => {});
+  match.start();
+  // Nach den Regeln unmöglich, deshalb mit einer Attrappe erzwungen.
+  match.game.playRandom = () => ({ ok: false, reason: 'kein Zug' });
+  match.expire();
+  assert.equal(error.mock.callCount(), 1);
+  assert.equal(changes.length, 0, 'kein Zustand ohne Zug');
+  assert.ok(match.remainingMs() > 59_000, 'die Uhr läuft neu');
+});
+
+test('Ein Fehler beim Zeitablauf wird geloggt und hält den Prozess nicht an', async (t) => {
+  const error = t.mock.method(console, 'error', () => {});
+  const { match } = newMatch({
+    turnMs: 20,
+    onChange: () => {
+      throw new Error('Absicht');
+    },
+  });
+  t.after(() => match.dispose());
+  match.start();
+  await new Promise((resolve) => setTimeout(resolve, 60));
+  assert.ok(error.mock.callCount() >= 1);
+  assert.match(String(error.mock.calls[0].arguments[0]), /Zeitablauf fehlgeschlagen/);
+});

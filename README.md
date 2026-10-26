@@ -16,7 +16,8 @@ Danach `http://localhost:3000` in zwei Browserfenstern öffnen.
 
 - `npm run build` prüft nur, ob alle JavaScript-Dateien syntaktisch korrekt sind. Gebündelt wird nichts, der Browser lädt die Module direkt.
 - Der Port kann auch über `PORT` gesetzt werden, die Bedenkzeit pro Zug über `TURN_SECONDS` (Standard: 60).
-- Der Server lauscht auf allen Adressen, also über IPv4 und IPv6.
+- Der Server lauscht auf allen Adressen, also über IPv4 und IPv6. So ist es für den Kursserver gedacht. Beim Entwickeln in einem fremden WLAN (Uni, Bahn) ist das Spiel damit aber für alle im Netz erreichbar. Dann besser `HOST=127.0.0.1` setzen.
+- Alle Einstellungen mit Beispielwerten stehen in `.env.example`. Als `.env` kopiert, lädt `node --env-file=.env server/index.js` sie.
 
 ## Spielablauf in Bildern
 
@@ -79,12 +80,21 @@ Zwei Browserfenster bei 1024×768: Christa spielt gegen Bruno. Jeder kann sein e
 
 ```bash
 npm test               # Tests (node:test)
+npm run test:coverage  # Tests mit Abdeckungsbericht
 npm run lint           # ESLint
+npm run lint:css       # Stylelint
+npm run lint:html      # html-validate
 npm run format:check   # Prettier
 npm run check          # alles zusammen
 ```
 
-Die Tests prüfen die Spielregeln, die Bedenkzeit, die Lobby und den Ablauf im Client. Zwei Testdateien starten den echten Server und spielen mit zwei Socket.io-Clients über das Netz.
+`lint:css` und `lint:html` laden Stylelint und html-validate in einer festen Version über `npx`, statt sie zu installieren. Die Regeln stehen in `.stylelintrc.json` und `.htmlvalidate.json`.
+
+Was die Tests abdecken:
+
+- Server: Spielregeln, Bedenkzeit, Lobby, die Prüfung der Namen und der Einstellungen. Drei Testdateien starten den echten Server und spielen mit Socket.io-Clients über das Netz, darunter die Grenzen gegen Überlastung und fremde Seiten. Der Server läuft dabei im Testprozess, damit er im Abdeckungsbericht erscheint. Den Start über `server/index.js` prüft ein eigener Test.
+- Client: die Module ohne DOM direkt, die Module mit DOM (Brett, Einstellungen, Uhr, Hinweise, Punktestand, Zugverlauf, Ergebnisfenster) unter jsdom.
+- Nicht automatisch getestet ist `main.js`, das die Module verbindet. Sein Ablauf wurde mit zwei Browserfenstern geprüft.
 
 ## Aufbau
 
@@ -93,12 +103,17 @@ server/
   game.js     Spielregeln
   match.js    eine Partie mit Bedenkzeit
   lobby.js    Spieler zusammenbringen, Partien verwalten
-  index.js    Express und Socket.io
+  app.js      Express und Socket.io, ein Handler pro Nachricht
+  limits.js   Herkunftsprüfung, Grenzen für Verbindungen und Nachrichten
+  config.js   Einstellungen aus Kommandozeile und Umgebung
+  index.js    startet den Server
 public/
   index.html
   css/        tokens, base, layout, board, components, dialogs
-  js/         main.js steuert, die übrigen Module zeichnen Brett, Uhr,
-              Zugverlauf und Hinweise oder verwalten die Einstellungen
+  js/         main.js verbindet, die übrigen Module zeichnen Brett, Uhr,
+              Punktestand, Zugverlauf, Hinweise und Ergebnis oder
+              verwalten die Einstellungen
+  shared/     Konstanten und Namensregel für Server und Client
 test/
 scripts/check.js
 ```
@@ -111,17 +126,22 @@ flowchart LR
     M --> H[hints.js]
     M --> S[settings.js]
     M --> F[flow.js]
+    M --> Sc[score.js]
+    M --> R[result.js]
     M --> N[net.js]
   end
   subgraph Server
-    I[index.js] --> L[lobby.js]
+    I[index.js] --> A[app.js]
+    A --> L[lobby.js]
     L --> Ma[match.js]
     Ma --> G[game.js]
   end
-  N <-->|Socket.io| I
+  N <-->|Socket.io| A
 ```
 
-`game.js` kennt weder Zeit noch Netzwerk, `match.js` keine Sockets. Dadurch lassen sich die Regeln ohne Server testen.
+`game.js` kennt weder Zeit noch Netzwerk, `match.js` keine Sockets. Dadurch lassen sich die Regeln ohne Server testen. `app.js` startet nichts selbst und beendet nie den Prozess; das tut nur `index.js`.
+
+`public/shared/` liegt unter `public/`, damit der Browser die Dateien unter `/shared/` laden kann und der Server sie direkt importiert. Derselbe Pfad `../shared/…` funktioniert so im Browser und in den Tests unter Node.
 
 ## Ablauf
 
@@ -175,12 +195,20 @@ sequenceDiagram
 
 Jeder Zug hat 60 Sekunden, die Uhr läuft auf dem Server. Läuft die Zeit ab, setzt der Server einen zufälligen erlaubten Stein für den Spieler. Einfach aussetzen lassen ginge nicht, weil Aussetzen bei Reversi nur erlaubt ist, wenn man keinen Zug hat. Wer dreimal hintereinander nicht selbst zieht, hat aufgegeben.
 
+## Bedienung ohne Maus
+
+- Das Brett ist ein Raster mit einem einzigen Tab-Stopp. Darin bewegen die Pfeiltasten den Fokus, Pos1 und Ende springen an den Rand der Zeile, Strg+Pos1 und Strg+Ende in die Ecken. Enter oder Leertaste setzt den Stein. Zu Beginn der Partie liegt der Fokus schon auf dem Brett.
+- Was gleichzeitig passiert (ein Zug, Aussetzen, wer jetzt dran ist), sagt der Screenreader in einer Ansage, statt dass sich mehrere Meldungen unterbrechen. Bei „Erlaubte Züge: Aus“ werden mögliche Züge auch nicht vorgelesen.
+- Im Windows-Kontrastdesign (`forced-colors`) erscheinen die Steine als volle und leere Kreise, das Gitter als Linien.
+
 ## Fehlerfälle
 
 - Schließt ein Spieler das Fenster, endet die Partie und der Gegner bekommt eine Meldung. Der Server läuft weiter.
 - Ungültige Nachrichten (falsche Koordinaten, Zug außerhalb der Reihe) lehnt der Server ab.
 - Fehler in einem Socket-Handler werden abgefangen und geloggt, damit der Server nicht abstürzt und andere Partien weiterlaufen.
 - Mehrere Partien laufen unabhängig voneinander.
+- Socket-Verbindungen von fremden Webseiten lehnt der Server ab. Er nimmt höchstens 50 Verbindungen je IP-Adresse an (`MAX_CONNECTIONS_PER_IP`), Nachrichten bis 4 KB und 20 Nachrichten pro Sekunde und Verbindung. Darüber verwirft er sie, damit eine Flut nicht die anderen Partien bremst.
+- Nach einem abgelehnten Zug schickt der Server das ganze Brett höchstens einmal pro Sekunde mit, nicht nach jeder Ablehnung.
 
 ## Regeln und Herkunft
 
@@ -197,11 +225,11 @@ Die Bedenkzeit, das Aufgeben und die Spielhilfen (Zugvorschau, Eckenmarkierung) 
 
 ## Fremde Bestandteile
 
-- `express` und `socket.io` (MIT-Lizenz). Für Tests und Codeprüfung zusätzlich `socket.io-client`, `eslint` und `prettier`, ebenfalls MIT.
+- `express` und `socket.io` (MIT-Lizenz). Für Tests und Codeprüfung zusätzlich `socket.io-client`, `jsdom`, `eslint` und `prettier`, ebenfalls MIT. Stylelint und html-validate (MIT) werden nur über `npx` geladen.
 - Die bunten Steinfarben stammen aus der Palette von Okabe und Ito, die auch bei Farbsehschwäche unterscheidbar bleibt ([Color Universal Design](https://jfly.uni-koeln.de/color/)).
 - Icons und Brett sind selbst gezeichnet. Es gibt keine fremden Bilder, Schriften oder Töne.
 
 ## Noch offen
 
 - In Firefox und Safari ist das Spiel noch nicht getestet.
-- Für das CSS gibt es keinen eigenen Linter. Stylelint würde bei `npm install` eine Sicherheitswarnung über eines seiner Unterpakete auslösen, deshalb ist es nicht eingebunden. Das CSS wird mit Prettier formatiert.
+- Auf sehr schmalen Smartphones (360 px) sind die Brettfelder gut 40 px groß statt 44 px. Für 44 px fehlen dort etwa 30 px, die nur ohne Seitenrand und Rahmen frei würden. 40 px liegen über den 24 px, die WCAG 2.2 (2.5.8) mindestens verlangt.

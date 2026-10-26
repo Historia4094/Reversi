@@ -14,7 +14,7 @@
  * prominent = als Einblendung über dem Brett statt am Rand.
  */
 
-import { squareName } from './constants.js';
+import { squareName } from '../shared/constants.js';
 
 const TIMES = { 1: 'einmal', 2: 'zweimal', 3: 'dreimal', 4: 'viermal', 5: 'fünfmal' };
 
@@ -38,88 +38,94 @@ export function visibleAt(level, notice) {
  * @returns {{text: string, tone: string, importance: string, prominent: boolean}[]}
  */
 export function noticesFor(events, { me, names }) {
-  const notices = [];
   const nameOf = (color) => names[color] ?? 'Dein Gegner';
+  return events.flatMap((event) => {
+    const build = BUILDERS[event.type];
+    return build ? build(event, { mine: event.player === me, name: nameOf(event.player) }) : [];
+  });
+}
 
-  for (const event of events) {
-    const mine = event.player === me;
+/**
+ * Eine Funktion je Ereignistyp. Jede bekommt das Ereignis und wer es
+ * ausgelöst hat (mine = ich selbst, name = Anzeigename) und liefert null,
+ * einen oder mehrere Hinweise.
+ */
+const BUILDERS = {
+  timeout: timeoutNotices,
+  pass: passNotices,
+  move: moveNotices,
+};
 
-    switch (event.type) {
-      case 'timeout': {
-        const left = event.max - event.count;
-        if (event.square === null) break; // Aufgabe – zeigt das Ergebnisfenster.
-        const where = squareName(event.square.row, event.square.col);
-        if (mine) {
-          notices.push({
-            text:
-              `Deine Zeit ist abgelaufen. Der Server hat zufällig ${where} für dich gesetzt. ` +
-              (left === 1
-                ? 'Beim nächsten Mal gilt die Partie als aufgegeben.'
-                : `Noch ${TIMES[left] ?? `${left}-mal`}, dann gilt die Partie als aufgegeben.`),
-            tone: 'bad',
-            importance: 'critical',
-            prominent: true,
-          });
-        } else {
-          notices.push({
-            text: `${nameOf(event.player)} hat nicht rechtzeitig gezogen. Der Server hat zufällig ${where} gesetzt.`,
-            tone: 'info',
-            importance: 'important',
-            prominent: true,
-          });
-        }
-        break;
-      }
-
-      case 'pass':
-        notices.push(
-          mine
-            ? {
-                text: 'Du hast keinen erlaubten Zug und musst aussetzen.',
-                tone: 'warn',
-                importance: 'important',
-                prominent: true,
-              }
-            : {
-                text: `${nameOf(event.player)} hat keinen erlaubten Zug und setzt aus. Du bist noch einmal dran.`,
-                tone: 'good',
-                importance: 'important',
-                prominent: true,
-              },
-        );
-        break;
-
-      case 'move': {
-        if (event.auto) break; // steht schon im Zeitablauf-Hinweis
-        const where = squareName(event.row, event.col);
-        if (event.corner) {
-          notices.push({
-            text: mine
-              ? `Ecke ${where} gesichert – dieser Stein kann nicht mehr gedreht werden.`
-              : `${nameOf(event.player)} hat die Ecke ${where} besetzt. Dieser Stein ist nicht mehr zu drehen.`,
-            tone: mine ? 'good' : 'warn',
-            importance: 'extra',
-            prominent: false,
-          });
-        }
-        if (event.flipped >= BIG_FLIP) {
-          notices.push({
-            text: mine
-              ? `Starker Zug: ${event.flipped} Steine auf einmal gedreht.`
-              : `${nameOf(event.player)} dreht ${event.flipped} Steine auf einmal.`,
-            tone: mine ? 'good' : 'info',
-            importance: 'extra',
-            prominent: false,
-          });
-        }
-        break;
-      }
-
-      default:
-        break;
-    }
+function timeoutNotices(event, { mine, name }) {
+  if (event.square === null) return []; // Aufgabe – zeigt das Ergebnisfenster.
+  const where = squareName(event.square.row, event.square.col);
+  if (!mine) {
+    return [
+      {
+        text: `${name} hat nicht rechtzeitig gezogen. Der Server hat zufällig ${where} gesetzt.`,
+        tone: 'info',
+        importance: 'important',
+        prominent: true,
+      },
+    ];
   }
+  const left = event.max - event.count;
+  const consequence =
+    left === 1
+      ? 'Beim nächsten Mal gilt die Partie als aufgegeben.'
+      : `Noch ${TIMES[left] ?? `${left}-mal`}, dann gilt die Partie als aufgegeben.`;
+  return [
+    {
+      text: `Deine Zeit ist abgelaufen. Der Server hat zufällig ${where} für dich gesetzt. ${consequence}`,
+      tone: 'bad',
+      importance: 'critical',
+      prominent: true,
+    },
+  ];
+}
 
+function passNotices(event, { mine, name }) {
+  return [
+    mine
+      ? {
+          text: 'Du hast keinen erlaubten Zug und musst aussetzen.',
+          tone: 'warn',
+          importance: 'important',
+          prominent: true,
+        }
+      : {
+          text: `${name} hat keinen erlaubten Zug und setzt aus. Du bist noch einmal dran.`,
+          tone: 'good',
+          importance: 'important',
+          prominent: true,
+        },
+  ];
+}
+
+function moveNotices(event, { mine, name }) {
+  if (event.auto) return []; // steht schon im Zeitablauf-Hinweis
+  const where = squareName(event.row, event.col);
+  const notices = [];
+  if (event.corner) {
+    notices.push({
+      text: mine
+        ? `Ecke ${where} gesichert – dieser Stein kann nicht mehr gedreht werden.`
+        : `${name} hat die Ecke ${where} besetzt. Dieser Stein ist nicht mehr zu drehen.`,
+      tone: mine ? 'good' : 'warn',
+      importance: 'extra',
+      prominent: false,
+    });
+  }
+  if (event.flipped >= BIG_FLIP) {
+    notices.push({
+      text: mine
+        ? `Starker Zug: ${event.flipped} Steine auf einmal gedreht.`
+        : `${name} dreht ${event.flipped} Steine auf einmal.`,
+      tone: mine ? 'good' : 'info',
+      importance: 'extra',
+      prominent: false,
+    });
+  }
   return notices;
 }
 

@@ -94,3 +94,53 @@ test('Begründungen für das Spielende', () => {
     /Bruno hat dreimal hintereinander nicht rechtzeitig gezogen/,
   );
 });
+
+test('Begründungen: alle Gründe aus beiden Blickwinkeln, unbekannter Grund leer', () => {
+  assert.equal(
+    endReasonText({ endReason: 'wipeout' }, ctx),
+    'Eine Farbe hat keinen Stein mehr auf dem Brett.',
+  );
+  assert.match(endReasonText({ endReason: 'noMoves', emptySquares: 1 }, ctx), /noch ein Feld frei/);
+  assert.equal(
+    endReasonText({ endReason: 'resign', forfeitedBy: WHITE }, ctx),
+    'Bruno hat aufgegeben.',
+  );
+  assert.match(
+    endReasonText({ endReason: 'inactive', forfeitedBy: BLACK, maxTimeouts: 7 }, ctx),
+    /^Du hast 7-mal hintereinander/,
+  );
+  assert.equal(
+    endReasonText({ endReason: 'resign', forfeitedBy: 9 }, ctx),
+    'Dein Gegner hat aufgegeben.',
+  );
+  assert.equal(endReasonText({ endReason: 'neu' }, ctx), '');
+});
+
+test('Unbekannte Ereignisse ergeben keinen Hinweis; Aufgabe durch Zeitablauf auch nicht', () => {
+  assert.deepEqual(noticesFor([{ type: 'gameOver', player: BLACK }], ctx), []);
+  assert.deepEqual(noticesFor([{ type: 'timeout', player: BLACK, square: null }], ctx), []);
+  assert.deepEqual(
+    noticesFor([{ type: 'move', player: BLACK, auto: true, row: 0, col: 0 }], ctx),
+    [],
+  );
+});
+
+test('Zeitablauf mit vielen erlaubten Fehlern: Zahl statt Wort', () => {
+  const [notice] = noticesFor(
+    [{ type: 'timeout', player: BLACK, count: 1, max: 9, square: { row: 0, col: 0 } }],
+    ctx,
+  );
+  assert.match(notice.text, /Noch 8-mal/);
+});
+
+test('Hinweisstufe: unbekannte Stufe zeigt alles', () => {
+  assert.equal(visibleAt('unbekannt', { importance: 'extra' }), true);
+});
+
+test('Ein Zustand ohne Zug für mich bringt keinen Hinweis', () => {
+  assert.deepEqual(
+    stateNotices({ yourTurn: true, finished: true, legalMoves: [{ row: 0, col: 0 }] }),
+    [],
+  );
+  assert.deepEqual(stateNotices({ yourTurn: true, finished: false, legalMoves: [{}, {}] }), []);
+});

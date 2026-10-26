@@ -10,11 +10,14 @@
     border-radius: var(--radius-xl);
     background: var(--c-panel);
     color: var(--c-text);
-    box-shadow: 0 20px 60px rgb(0 0 0 / 35%);
+    box-shadow: var(--shadow-dialog);
     overflow: hidden;
 
     opacity: 1;
-    translate: 0 0;
+    /* none statt 0 0: Jeder andere Wert macht das Fenster zum Bezugsrahmen
+       für position: fixed. Die Toasts, die bei offenem Fenster darin
+       liegen (notices.js), würden dann im Fenster abgeschnitten. */
+    translate: none;
 
     /* Ein- und Ausblenden. display und overlay mit allow-discrete halten
        das Fenster beim Schließen sichtbar, bis die Ausblendung fertig ist.
@@ -40,7 +43,7 @@
       background: var(--c-backdrop);
     }
 
-    @media (max-width: 37.5rem) {
+    @media (width <= 37.5rem) {
       width: 100%;
       max-width: 100%;
       max-height: 92dvh;
@@ -80,7 +83,7 @@
   }
 
   .sheet__intro {
-    font-size: var(--step-minus-1);
+    font-size: var(--step-0);
     color: var(--c-text-quiet);
   }
 
@@ -104,18 +107,15 @@
     min-width: 0;
   }
 
+  /* Schriftformat wie .field__label (components.css). */
   .group__title {
     padding: 0;
     margin-block-end: var(--space-1);
-    font-size: var(--step-minus-1);
     font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--c-text-quiet);
   }
 
   .group__note {
-    font-size: var(--step-minus-1);
+    font-size: var(--step-0);
     color: var(--c-text-quiet);
   }
 
@@ -124,7 +124,7 @@
     border-radius: var(--radius);
     background: color-mix(in oklab, var(--c-warn) 12%, white);
     color: color-mix(in oklab, var(--c-warn) 80%, black);
-    font-size: var(--step-minus-1);
+    font-size: var(--step-0);
   }
 
   .stones {
@@ -137,30 +137,30 @@
     grid-template-columns: auto 1fr minmax(8rem, 12rem);
     align-items: center;
     gap: var(--space-3);
-  }
 
-  /* Ohne Stein-Vorschau (z. B. bei "Hinweise") rückt das Label nach vorn. */
-  .field--inline:not(:has(.stone-badge)) {
-    grid-template-columns: 1fr minmax(8rem, 12rem);
-  }
+    /* Ohne Stein-Vorschau (z. B. bei "Hinweise") rückt das Label nach vorn. */
+    &:not(:has(.stone-badge)) {
+      grid-template-columns: 1fr minmax(8rem, 12rem);
+    }
 
-  .field--inline .field__label {
-    margin: 0;
-    font-size: var(--step-0);
-    letter-spacing: 0;
-    text-transform: none;
-    color: var(--c-text);
-  }
+    /* Neben dem Auswahlfeld wie normaler Text statt als Überschrift. */
+    & .field__label {
+      margin: 0;
+      letter-spacing: 0;
+      text-transform: none;
+      color: var(--c-text);
+    }
 
-  @media (max-width: 26.25rem) {
-    .field--inline {
+    @media (width <= 26.25rem) {
       grid-template-columns: auto 1fr;
-    }
-    .field--inline:not(:has(.stone-badge)) {
-      grid-template-columns: 1fr;
-    }
-    .field--inline .field__select {
-      grid-column: 1 / -1;
+
+      &:not(:has(.stone-badge)) {
+        grid-template-columns: 1fr;
+      }
+
+      & .field__select {
+        grid-column: 1 / -1;
+      }
     }
   }
 
@@ -170,6 +170,8 @@
     grid-template-columns: auto 1fr;
     gap: var(--space-3);
     align-items: start;
+    /* Auch ein Schalter ohne Beschreibungszeile ist so hoch wie ein Knopf. */
+    min-block-size: var(--touch);
     cursor: pointer;
 
     & input {
@@ -190,7 +192,7 @@
     }
 
     & span {
-      font-size: var(--step-minus-1);
+      font-size: var(--step-0);
       color: var(--c-text-quiet);
     }
   }
@@ -227,12 +229,14 @@
     }
 
     & span {
-      display: block;
+      display: grid;
+      place-items: center;
+      min-block-size: var(--touch);
       padding: var(--space-2) var(--space-3);
       border: 1px solid var(--c-border);
       border-radius: var(--radius);
       text-align: center;
-      font-size: var(--step-minus-1);
+      font-size: var(--step-0);
     }
 
     &:has(input:checked) span {
@@ -243,8 +247,8 @@
     }
 
     &:has(input:focus-visible) span {
-      outline: 2px solid var(--c-accent);
-      outline-offset: 2px;
+      outline: var(--focus-outline);
+      outline-offset: var(--focus-offset);
     }
   }
 
@@ -265,11 +269,11 @@
       opacity: 0;
       scale: 0.96;
     }
-  }
 
-  /* Leichter Schleier: das Endbrett bleibt dahinter erkennbar. */
-  .result::backdrop {
-    background: color-mix(in oklab, var(--c-backdrop), transparent 10%);
+    /* Leichter Schleier: das Endbrett bleibt dahinter erkennbar. */
+    &::backdrop {
+      background: color-mix(in oklab, var(--c-backdrop), transparent 10%);
+    }
   }
 
   .result__card {
@@ -279,12 +283,6 @@
     gap: var(--space-3);
   }
 
-  .result__title {
-    font-size: var(--step-2);
-    font-weight: 600;
-    letter-spacing: -0.02em;
-  }
-
   .result__reason {
     color: var(--c-text);
   }
@@ -292,7 +290,11 @@
     color: var(--c-text-quiet);
   }
 
-  .result .button {
+  .result__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-2);
     margin-block-start: var(--space-2);
   }
 }

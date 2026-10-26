@@ -7,6 +7,7 @@
        freigehalten. -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="description" content="Reversi für zwei Spieler im Browser." />
+    <!-- Gleicher Wert wie --forest in tokens.css; HTML kann kein CSS lesen. -->
     <meta name="theme-color" content="#33463c" />
     <title>Reversi</title>
 
@@ -52,7 +53,7 @@
             Sobald sich ein zweiter Spieler anmeldet, werdet ihr automatisch verbunden und die
             Partie beginnt.
           </p>
-          <form id="login-form" class="form" autocomplete="off">
+          <form id="login-form" class="form">
             <label class="field">
               <span class="field__label">Dein Name</span>
               <input
@@ -62,7 +63,10 @@
                 name="name"
                 maxlength="20"
                 required
-                placeholder="z. B. Christa"
+                pattern=".*\p{L}.*\p{L}.*"
+                title="Mindestens zwei Buchstaben."
+                autocomplete="nickname"
+                placeholder="z. B. Anna"
                 autocapitalize="words"
                 enterkeyhint="go"
               />
@@ -202,12 +206,14 @@
              darüber; der Balken zeigt die Verschiebung, die bei Reversi
              mit jedem Zug passieren kann. Für Screenreader ausgeblendet,
              weil er nichts sagt, was die Zahlen nicht schon sagen. -->
-          <div class="tally" aria-hidden="true">
-            <span class="tally__black" id="tally-black"></span>
+          <div class="tally" id="tally" aria-hidden="true">
+            <span class="tally__black"></span>
             <span class="tally__white"></span>
           </div>
 
-          <p id="turn-indicator" class="turn" role="status">Schwarz beginnt.</p>
+          <!-- Ohne eigene Live-Region: Wer am Zug ist, sagt die zentrale
+             Ansage (#announcer) zusammen mit den übrigen Ereignissen an. -->
+          <p id="turn-indicator" class="turn">Schwarz beginnt.</p>
 
           <div id="clock" class="clock" data-state="normal" hidden>
             <div class="clock__row">
@@ -217,7 +223,9 @@
             <div class="clock__bar"><span id="clock-fill" class="clock__fill"></span></div>
           </div>
 
-          <p id="hint" class="hint" aria-live="polite"></p>
+          <!-- Sichtbarer Merker bis zum nächsten Zug. Vorgelesen werden
+             Ablehnung und Aussetzen schon als Hinweis über #announcer. -->
+          <p id="hint" class="hint"></p>
           <p id="strikes" class="strikes" hidden></p>
         </section>
 
@@ -242,12 +250,28 @@
             <span>7</span>
             <span>8</span>
           </div>
-          <div id="board" class="board" role="group" aria-label="Spielbrett, 8 mal 8 Felder"></div>
+          <!-- role="grid": ein Tab-Stopp, darin Pfeiltasten (board.js). -->
+          <div id="board" class="board" role="grid" aria-label="Spielbrett, 8 mal 8 Felder"></div>
           <!-- Wichtige Ereignisse (Aussetzen, Zeitablauf) erscheinen hier,
-             direkt über dem Brett. role="alert": Screenreader lesen sie
-             sofort vor. Die Einblendung verschwindet nach ein paar Sekunden
-             von selbst; Antippen oder Escape schließt sie früher. -->
-          <p id="banner" class="banner" role="alert" hidden></p>
+             direkt über dem Brett. Klicks gehen durch die Einblendung
+             hindurch aufs Brett; schließen lässt sie sich mit dem Knopf oder
+             Escape, sonst verschwindet sie nach ein paar Sekunden. Vorgelesen
+             wird der Text über #announcer. -->
+          <div id="banner" class="banner" hidden>
+            <p class="banner__text"></p>
+            <button type="button" class="banner__close">
+              <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18">
+                <path
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  d="M6 6l12 12M18 6 6 18"
+                />
+              </svg>
+              <span class="visually-hidden">Hinweis schließen</span>
+            </button>
+          </div>
         </div>
 
         <section class="card details" aria-label="Partie">
@@ -294,15 +318,22 @@
       </section>
     </main>
 
-    <!-- Kurze Hinweise am Rand. role="status" ist von sich aus "polite":
-       Screenreader lesen sie vor, ohne den Spieler zu unterbrechen. -->
-    <div id="toasts" class="toasts" role="status"></div>
+    <!-- Kurze Hinweise am Rand, nur sichtbar: Vorgelesen wird derselbe
+       Text über #announcer, deshalb aria-hidden. -->
+    <div id="toasts" class="toasts" aria-hidden="true"></div>
+    <!-- Die einzige Live-Region für Spielereignisse. Was gleichzeitig
+       passiert, kommt als eine Ansage, statt dass sich vier Regionen
+       gegenseitig unterbrechen. Bei offenem Fenster liegt sie im Fenster,
+       weil der Rest der Seite dann inert ist (notices.js). -->
+    <div id="announcer" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
 
     <!-- Einstellungen. <dialog> mit showModal() übernimmt Fokusführung,
        Escape zum Schließen und das Sperren des Hintergrunds. -->
     <dialog id="settings" class="sheet" aria-labelledby="settings-title">
       <form method="dialog" class="sheet__form">
-        <header class="sheet__head">
+        <!-- <div> statt <header>: Ein <header> außerhalb von <main> wäre ein
+           zweiter "banner"-Bereich neben der Kopfzeile der Seite. -->
+        <div class="sheet__head">
           <h2 id="settings-title" class="sheet__title">Einstellungen</h2>
           <button type="submit" class="icon-button" aria-label="Einstellungen schließen">
             <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20">
@@ -315,7 +346,7 @@
               />
             </svg>
           </button>
-        </header>
+        </div>
 
         <div class="sheet__body">
           <p class="sheet__intro">
@@ -492,15 +523,20 @@
     </dialog>
 
     <!-- Ergebnis. Liegt über dem Spiel, damit das Endbrett sichtbar bleibt.
-       Escape schließt es; danach führt "Neue Partie" unter dem Brett zurück. -->
+       "Brett ansehen" oder Escape schließt es; danach führt "Neue Partie"
+       unter dem Brett zurück. Der Knopf ist nötig, weil iPhone und iPad
+       keine Escape-Taste haben. -->
     <dialog id="result" class="result" aria-labelledby="result-title">
       <div class="result__card">
         <h2 id="result-title" class="result__title">Partie beendet</h2>
         <p id="result-reason" class="result__reason"></p>
         <p id="result-detail" class="result__detail"></p>
-        <button type="button" id="play-again" class="button button--primary">
-          Erneut anmelden
-        </button>
+        <div class="result__actions">
+          <button type="button" id="view-board" class="button button--quiet">Brett ansehen</button>
+          <button type="button" id="play-again" class="button button--primary">
+            Erneut anmelden
+          </button>
+        </div>
       </div>
     </dialog>
 

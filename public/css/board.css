@@ -18,8 +18,9 @@
   .coords {
     display: none;
     font-family: var(--font-num);
-    font-size: var(--step-minus-2);
-    color: var(--c-marker-soft);
+    font-size: var(--step-0);
+    /* Steinweiß: auf allen vier Rahmenfarben mindestens 4,5:1. */
+    color: var(--c-bone);
     user-select: none;
   }
 
@@ -53,16 +54,20 @@
     background: var(--c-felt);
     /* Breite steht in layout.css, weil sie in die Brettgröße eingeht. */
     border: var(--board-border, 2px) solid var(--c-felt-line);
-    /* Damit die Drehung räumlich wirkt und nicht wie ein Aufblenden. */
-    perspective: 900px;
     /* Langes Drücken auf dem Handy soll kein Kontextmenü und keine
-       Textauswahl auslösen. */
-    user-select: none;
-    /* Ältere Safari-Versionen kennen user-select nur mit Präfix;
-       touch-callout (Vorschau-Menü bei langem Drücken) gibt es nur in
-       Safari. */
+       Textauswahl auslösen. Ältere Safari-Versionen kennen user-select
+       nur mit Präfix, touch-callout gibt es nur in Safari. */
     -webkit-user-select: none;
+    user-select: none;
     -webkit-touch-callout: none;
+  }
+
+  /* Eine Zeile des ARIA-Grids. subgrid übernimmt die Spalten des Bretts,
+     dadurch bleiben alle Felder exakt gleich breit wie vorher. */
+  .board__row {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: subgrid;
   }
 
   /* --- Felder --------------------------------------------------------
@@ -80,24 +85,54 @@
     display: grid;
     place-items: center;
     aspect-ratio: 1;
+    /* perspective wirkt nur auf die Kinder. Der Stein (.disc) ist das Kind
+       des Feldes, deshalb steht sie hier und nicht auf .board. Etwa die
+       dreifache Feldgröße lässt die Drehung räumlich wirken. */
+    perspective: calc(var(--cell) * 3);
     background: var(--c-felt);
     box-shadow:
-      inset -1px -1px 0 var(--c-felt-line),
+      inset -1px -1px 0 var(--c-grid),
       var(--cell-mark);
     cursor: default;
     -webkit-tap-highlight-color: transparent;
   }
 
   /* Nur erlaubte Felder reagieren. Die Liste kommt vom Server. */
-  .cell:not(:disabled) {
+  .cell:not([aria-disabled='true']) {
     cursor: pointer;
   }
 
+  /* Fokus als doppelter Ring, hell außen und dunkel innen: Eine der
+     beiden Farben hebt sich auf jedem Brett ab, und die Form ist eine
+     andere als beim Rahmen des letzten Zugs (einfach, in Markerfarbe). */
   .cell:focus-visible {
-    outline: 2px solid var(--c-marker-soft);
+    outline: 3px solid var(--c-focus-light);
     outline-offset: -3px;
+    box-shadow:
+      inset -1px -1px 0 var(--c-grid),
+      inset 0 0 0 6px var(--c-focus-dark);
   }
 
+  /* --- Symbole auf den Steinen (Farbenblind-Modus) -------------------
+     Die Seite ist dann nicht nur an der Farbe erkennbar, sondern auch an
+     der Form: Punkt = schwarze Seite, Kreuz = weiße Seite. Die Symbole
+     gelten auch für die Anzeige im Punktestand und im Zugverlauf. */
+  :root[data-symbols='on'] :is(.disc__face--black, .stone-badge[data-side='black'])::after {
+    content: '';
+    inline-size: 30%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: var(--stone-b-mark);
+  }
+
+  :root[data-symbols='on'] :is(.disc__face--white, .stone-badge[data-side='white'])::after {
+    content: '';
+    inline-size: 42%;
+    aspect-ratio: 1;
+    background:
+      linear-gradient(45deg, transparent 41%, var(--stone-w-mark) 41% 59%, transparent 59%),
+      linear-gradient(-45deg, transparent 41%, var(--stone-w-mark) 41% 59%, transparent 59%);
+  }
   /* Ringe für erlaubte Züge. Alle Regeln für die Ringe beginnen mit
      demselben :root-Teil, damit Hover und Fokus unten dieselbe
      Spezifität haben und die Grundregel zuverlässig überschreiben. */
@@ -105,7 +140,7 @@
     content: '';
     display: grid;
     place-items: center;
-    width: 36%;
+    inline-size: 36%;
     aspect-ratio: 1;
     border: 2px solid var(--c-marker);
     border-radius: 50%;
@@ -118,30 +153,40 @@
   /* Ringe mit Anzahl: wie viele Steine dieser Zug umdrehen würde. */
   :root[data-move-hints='counts'] .cell[data-legal='true']::after {
     content: attr(data-flips);
-    width: 46%;
+    /* Größerer Ring, damit auch zweistellige Zahlen hineinpassen. */
+    inline-size: 70%;
     font-family: var(--font-num);
-    font-size: calc(var(--cell) * 0.28);
+    /* Text: mindestens 1rem und eine eigene Farbe mit 4,5:1. */
+    font-size: max(1rem, calc(var(--cell) * 0.28));
     font-weight: 600;
     line-height: 1;
-    color: var(--c-marker);
+    color: var(--c-marker-text);
   }
 
-  /* Hover nur dort, wo es eine Maus gibt – auf Touch-Geräten bliebe der
-     Zustand sonst nach dem Antippen hängen. */
-  @media (hover: hover) {
-    :root:not([data-move-hints='off']) .cell[data-legal='true']:hover::after {
+  /* Ring größer bei Fokus und, wo es eine Maus gibt, beim Überfahren.
+     Hover nur mit (hover: hover): Auf Touch-Geräten bliebe der Zustand
+     sonst nach dem Antippen hängen. */
+  :root:not([data-move-hints='off']) .cell[data-legal='true'] {
+    &:focus-visible::after {
       opacity: 1;
       scale: 1.15;
     }
 
-    :root[data-move-hints='off'] .cell:not(:disabled):hover {
-      background: color-mix(in oklab, var(--c-felt) 88%, white);
+    @media (hover: hover) {
+      &:hover::after {
+        opacity: 1;
+        scale: 1.15;
+      }
     }
   }
 
-  :root:not([data-move-hints='off']) .cell[data-legal='true']:focus-visible::after {
-    opacity: 1;
-    scale: 1.15;
+  /* Ohne Ringe zeigt das Überfahren, welches Feld man antippen würde. */
+  :root[data-move-hints='off'] .cell:not([aria-disabled='true']) {
+    @media (hover: hover) {
+      &:hover {
+        background: color-mix(in oklab, var(--c-felt) 88%, white);
+      }
+    }
   }
 
   /* Der zuletzt gesetzte Stein bekommt einen Rahmen, damit man den Zug
@@ -155,31 +200,31 @@
      gedreht werden können. Ein kleiner Punkt am äußeren Rand weist
      darauf hin, ohne mit den Ringen der erlaubten Züge verwechselt zu
      werden: die sitzen mittig, diese am Rand. */
-  .cell:nth-child(1)::before,
-  .cell:nth-child(8)::before,
-  .cell:nth-child(57)::before,
-  .cell:nth-child(64)::before {
+  .board__row:first-child > .cell:first-child::before,
+  .board__row:first-child > .cell:last-child::before,
+  .board__row:last-child > .cell:first-child::before,
+  .board__row:last-child > .cell:last-child::before {
     content: '';
     position: absolute;
-    width: max(0.3rem, calc(var(--cell) * 0.1));
+    inline-size: max(0.3rem, calc(var(--cell) * 0.1));
     aspect-ratio: 1;
     border-radius: 50%;
     background: color-mix(in oklab, var(--c-marker-soft) 70%, transparent);
   }
 
-  .cell:nth-child(1)::before {
+  .board__row:first-child > .cell:first-child::before {
     inset-block-start: var(--space-1);
     inset-inline-start: var(--space-1);
   }
-  .cell:nth-child(8)::before {
+  .board__row:first-child > .cell:last-child::before {
     inset-block-start: var(--space-1);
     inset-inline-end: var(--space-1);
   }
-  .cell:nth-child(57)::before {
+  .board__row:last-child > .cell:first-child::before {
     inset-block-end: var(--space-1);
     inset-inline-start: var(--space-1);
   }
-  .cell:nth-child(64)::before {
+  .board__row:last-child > .cell:last-child::before {
     inset-block-end: var(--space-1);
     inset-inline-end: var(--space-1);
   }
@@ -191,7 +236,7 @@
      data-color an, ohne zusätzliche Animationslogik im JavaScript. */
   .disc {
     position: relative;
-    width: 78%;
+    inline-size: 78%;
     aspect-ratio: 1;
     transform-style: preserve-3d;
     transition: transform var(--flip-duration) var(--ease-flip);
@@ -215,29 +260,25 @@
     place-items: center;
     border-radius: 50%;
     backface-visibility: hidden;
-    /* Feiner Rand: hebt auch farbige Steine vom Brett ab, deren Farbe
-       dem Brett ähnelt (z. B. Blaugrün auf Filz). */
+    /* Rand je Seite aus tokens.css: hebt den Stein mit mindestens 3:1
+       vom Brett ab, auch dunkle Steine auf dunklem Filz. Bei eigenen
+       Steinfarben setzt settings.js --user-edge-b/-w, wenn der Rand aus
+       tokens.css zur gewählten Farbe nicht passt. */
     box-shadow:
-      inset 0 0 0 1px rgb(0 0 0 / 28%),
+      inset 0 0 0 1.5px var(--edge),
       var(--shadow-disc);
   }
 
   .disc__face--black {
-    background: radial-gradient(
-      circle at 34% 28%,
-      var(--stone-b-hi),
-      var(--stone-b) 55%,
-      var(--stone-b-lo)
-    );
+    --edge: var(--user-edge-b, var(--stone-edge-b));
+
+    background: var(--stone-b-face);
   }
 
   .disc__face--white {
-    background: radial-gradient(
-      circle at 34% 28%,
-      var(--stone-w-hi),
-      var(--stone-w) 55%,
-      var(--stone-w-lo)
-    );
+    --edge: var(--user-edge-w, var(--stone-edge-w));
+
+    background: var(--stone-w-face);
     transform: rotateY(180deg);
   }
 
@@ -257,27 +298,33 @@
       opacity: 1;
     }
   }
-}
 
-@layer board {
-  /* --- Symbole auf den Steinen (Farbenblind-Modus) -------------------
-     Die Seite ist dann nicht nur an der Farbe erkennbar, sondern auch an
-     der Form: Punkt = schwarze Seite, Kreuz = weiße Seite. Die Symbole
-     gelten auch für die Anzeige im Punktestand und im Zugverlauf. */
-  :root[data-symbols='on'] :is(.disc__face--black, .stone-badge[data-side='black'])::after {
-    content: '';
-    width: 30%;
-    aspect-ratio: 1;
-    border-radius: 50%;
-    background: var(--stone-b-mark);
-  }
+  /* --- Windows-Kontrastdesigns (forced-colors) ------------------------
+     Der Browser ersetzt dann alle Farben durch Systemfarben und entfernt
+     box-shadow und Verläufe. Ohne diese Regeln wären Gitter, Steine und
+     Markierungen weg und das Brett eine einfarbige Fläche. Die Steine
+     werden zu vollen (CanvasText) und leeren (Canvas mit Rand) Kreisen. */
+  @media (forced-colors: active) {
+    .cell {
+      border: 1px solid CanvasText;
+    }
 
-  :root[data-symbols='on'] :is(.disc__face--white, .stone-badge[data-side='white'])::after {
-    content: '';
-    width: 42%;
-    aspect-ratio: 1;
-    background:
-      linear-gradient(45deg, transparent 41%, var(--stone-w-mark) 41% 59%, transparent 59%),
-      linear-gradient(-45deg, transparent 41%, var(--stone-w-mark) 41% 59%, transparent 59%);
+    .disc__face--black {
+      background: CanvasText;
+    }
+
+    .disc__face--white {
+      background: Canvas;
+      border: 2px solid CanvasText;
+    }
+
+    /* border statt outline, damit der Fokusrahmen daneben sichtbar bleibt. */
+    :root:not([data-last-move='off']) .cell[data-last='true'] {
+      border: 3px solid Highlight;
+    }
+
+    .cell:focus-visible {
+      outline: 3px solid Highlight;
+    }
   }
 }

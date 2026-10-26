@@ -12,6 +12,15 @@ const TICK_MS = 250;
 export const WARN_MS = 15_000;
 const CRITICAL_MS = 5_000;
 
+/**
+ * Warnschwelle für eine Bedenkzeit. Ist der ganze Zug nicht länger als
+ * WARN_MS (TURN_SECONDS=8), läge die Restzeit schon beim Start unter der
+ * Schwelle, und die Warnung käme nie. Dann warnt die Uhr zur Hälfte.
+ */
+export function warnAt(totalMs) {
+  return totalMs > WARN_MS ? WARN_MS : totalMs / 2;
+}
+
 export class ClockView {
   /**
    * @param {{root: HTMLElement, time: HTMLElement, fill: HTMLElement, label: HTMLElement}} elements
@@ -24,6 +33,8 @@ export class ClockView {
     this.interval = null;
     this.deadline = 0;
     this.total = 1;
+    this.warnMs = WARN_MS;
+    this.criticalMs = CRITICAL_MS;
     this.mine = false;
     this.warned = false;
   }
@@ -39,7 +50,11 @@ export class ClockView {
     this.deadline = Date.now() + remainingMs;
     this.total = Math.max(1, totalMs);
     this.mine = mine;
-    this.warned = remainingMs <= WARN_MS;
+    this.warnMs = warnAt(this.total);
+    this.criticalMs = Math.min(CRITICAL_MS, this.warnMs / 3);
+    // Neu gestartet unterhalb der Schwelle (Einstellung geändert): Die
+    // Warnung kam schon, sie soll nicht doppelt kommen.
+    this.warned = remainingMs <= this.warnMs;
     this.el.label.textContent = label;
     this.el.root.hidden = false;
     this.el.root.dataset.mine = String(mine);
@@ -51,14 +66,14 @@ export class ClockView {
     const left = Math.max(0, this.deadline - Date.now());
     const seconds = Math.ceil(left / 1000);
     this.el.time.textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
-    this.el.fill.style.transform = `scaleX(${left / this.total})`;
+    this.el.fill.style.setProperty('--remaining', String(left / this.total));
 
     let state = 'normal';
-    if (left <= CRITICAL_MS) state = 'critical';
-    else if (left <= WARN_MS) state = 'warn';
+    if (left <= this.criticalMs) state = 'critical';
+    else if (left <= this.warnMs) state = 'warn';
     this.el.root.dataset.state = state;
 
-    if (this.mine && !this.warned && left <= WARN_MS && left > 0) {
+    if (this.mine && !this.warned && left <= this.warnMs && left > 0) {
       this.warned = true;
       this.onWarn(seconds);
     }

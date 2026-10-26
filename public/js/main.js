@@ -7,20 +7,25 @@
  * Zeit abläuft und wer gewonnen hat, steht ausschließlich in den
  * Nachrichten vom Server.
  *
- * Die eigentliche Arbeit liegt in kleinen Modulen:
+ * Diese Datei verbindet nur: Sie reagiert auf Bedienung und Nachrichten
+ * und reicht sie an die Module weiter, die die eigentliche Arbeit tun:
  *   board.js    Brett zeichnen          settings.js  Einstellungen
- *   clock.js    Bedenkzeit anzeigen     notices.js   Einblendungen
+ *   clock.js    Bedenkzeit anzeigen     notices.js   Hinweise und Ansagen
+ *   score.js    Punktestand, Zuganzeige result.js    Ergebnisfenster
  *   log.js      Zugverlauf              hints.js     Ereignis -> Hinweistext
  *   flow.js     Suchen/Spielen/Fertig, Schutz vor veralteten Nachrichten
  */
-import { BLACK, WHITE, opponentOf } from './constants.js';
+import { BLACK, opponentOf, sideName } from '../shared/constants.js';
 import { connect } from './net.js';
 import { BoardView } from './board.js';
 import { Settings } from './settings.js';
 import { Notifier } from './notices.js';
 import { ClockView } from './clock.js';
 import { MoveLog } from './log.js';
+import { ScoreView } from './score.js';
+import { ResultView } from './result.js';
 import { Flow } from './flow.js';
+import { cleanName, exampleName } from '../shared/names.js';
 import { noticesFor, stateNotices, endReasonText, visibleAt } from './hints.js';
 
 const $ = (id) => document.getElementById(id);
@@ -42,25 +47,10 @@ const el = {
   waitingTimer: $('waiting-timer'),
   cancelWaiting: $('cancel-waiting'),
   board: $('board'),
-  scoreBlack: $('score-black'),
-  scoreWhite: $('score-white'),
-  scoreBlackValue: $('score-black-value'),
-  scoreWhiteValue: $('score-white-value'),
-  scoreBlackName: $('score-black-name'),
-  scoreWhiteName: $('score-white-name'),
-  tallyBlack: $('tally-black'),
-  turn: $('turn-indicator'),
-  hint: $('hint'),
-  strikes: $('strikes'),
   resign: $('resign'),
   newGame: $('new-game'),
   settingsDialog: $('settings'),
   settingsReset: $('settings-reset'),
-  result: $('result'),
-  resultTitle: $('result-title'),
-  resultReason: $('result-reason'),
-  resultDetail: $('result-detail'),
-  playAgain: $('play-again'),
 };
 
 /** In welcher Phase dieses Fenster ist – siehe flow.js. */
@@ -74,19 +64,30 @@ const session = {
   waitingSince: 0,
   waitTimer: null,
   lastState: null,
+  /** Wann lastState angekommen ist – die Restzeit darin gilt für diesen Moment. */
+  receivedAt: 0,
   /** Grund für den zuletzt abgelehnten Zug; bleibt bis zum nächsten Zug stehen. */
   rejection: '',
   resignTimer: null,
   resultTimer: null,
   offline: false,
+  /** Zuletzt angesagte Zuganzeige und Zeitüberschreitungen, um nur Änderungen vorzulesen. */
+  spokenTurn: '',
+  spokenStrikes: '',
 };
 
 const settings = new Settings();
 settings.bind();
 
 const boardView = new BoardView(el.board, (row, col) => net.move(row, col));
-const notifier = new Notifier({ toastRoot: $('toasts'), banner: $('banner') });
+const notifier = new Notifier({
+  toastRoot: $('toasts'),
+  banner: $('banner'),
+  announcer: $('announcer'),
+});
 const moveLog = new MoveLog($('move-log'), $('move-log-empty'));
+const score = new ScoreView();
+const result = new ResultView($('result'), { open: openDialog, onPlayAgain: startOver });
 const clock = new ClockView(
   { root: $('clock'), time: $('clock-time'), fill: $('clock-fill'), label: $('clock-label') },
   {
@@ -123,6 +124,19 @@ function showScreen(name) {
   window.scrollTo(0, 0);
 }
 
+/**
+ * Öffnet ein modales Fenster. Toasts und Ansagen ziehen mit hinein,
+ * sonst lägen sie unter dem abgedunkelten Hintergrund (notices.js).
+ */
+function openDialog(dialog) {
+  if (!dialog.open) dialog.showModal();
+  notifier.attach(dialog);
+}
+
+for (const dialog of [el.settingsDialog, $('result')]) {
+  dialog.addEventListener('close', () => notifier.detach(dialog));
+}
+
 /** Zeigt einen Hinweis – sofern die Stufe in den Einstellungen es zulässt. */
 function notify(notice) {
   const full = { tone: 'info', importance: 'important', prominent: false, ...notice };
@@ -133,14 +147,10 @@ function perspective() {
   return { me: session.color, names: session.names };
 }
 
-function sideName(color) {
-  return color === BLACK ? 'black' : 'white';
-}
-
 /* --- Einstellungen ------------------------------------------------- */
 
 for (const button of document.querySelectorAll('[data-open-settings]')) {
-  button.addEventListener('click', () => el.settingsDialog.showModal());
+  button.addEventListener('click', () => openDialog(el.settingsDialog));
 }
 
 el.settingsReset.addEventListener('click', () => settings.reset());
@@ -152,13 +162,19 @@ settings.onChange(() => {
 
 /* --- Anmeldung ----------------------------------------------------- */
 
+// Bei jedem Laden ein anderes Beispiel; ohne JavaScript bleibt das aus
+// index.html stehen.
+el.nameInput.placeholder = `z. B. ${exampleName()}`;
+
 el.loginForm.addEventListener('submit', (event) => {
   event.preventDefault();
-  const name = el.nameInput.value.trim();
+  // Dieselbe Regel wie auf dem Server: Ein Name braucht mindestens zwei
+  // Buchstaben. Leerzeichen, Satzzeichen und Symbole allein zählen nicht.
+  const name = cleanName(el.nameInput.value);
 
   if (name.length === 0) {
     el.loginError.textContent =
-      'Trag einen Namen ein, damit dein Gegner weiß, gegen wen er spielt.';
+      'Dein Name braucht mindestens zwei Buchstaben, damit dein Gegner weiß, gegen wen er spielt.';
     el.loginError.hidden = false;
     return;
   }
@@ -223,13 +239,19 @@ function disarmResign() {
 // Endbrett anzusehen. Der Weg zurück bleibt dann der Knopf
 // "Neue Partie", der nach Spielende statt "Aufgeben" erscheint.
 function startOver() {
-  if (el.result.open) el.result.close();
+  // Ein Ergebnis, das noch aussteht (900 ms nach Spielende), darf nicht
+  // später über einer neuen Suche erscheinen.
+  clearTimeout(session.resultTimer);
+  session.resultTimer = null;
+  // Läuft schon eine neue Suche, muss der Server davon erfahren. Sonst
+  // bliebe dort eine Anmeldung stehen, die niemand mehr sieht.
+  if (flow.searching) net.leave();
+  result.close();
   boardView.reset();
   session.lastState = null;
   backToThemeScreen();
 }
 
-el.playAgain.addEventListener('click', startOver);
 el.newGame.addEventListener('click', startOver);
 
 /** Aufgeben während der Partie, "Neue Partie" danach. */
@@ -239,13 +261,8 @@ function showGameActions(over) {
 }
 
 function showResult(title, reason, detail) {
-  el.resultTitle.textContent = title;
-  el.resultReason.textContent = reason;
-  el.resultReason.hidden = reason === '';
-  el.resultDetail.textContent = detail;
   if (el.settingsDialog.open) el.settingsDialog.close();
-  if (!el.result.open) el.result.showModal();
-  el.playAgain.focus();
+  result.show({ title, reason, detail });
 }
 
 /* --- Servernachrichten -------------------------------------------- */
@@ -274,6 +291,8 @@ function onGameStart(payload) {
     [opponentOf(payload.yourColor)]: payload.opponentName,
   };
   session.rejection = '';
+  session.spokenTurn = '';
+  session.spokenStrikes = '';
   el.startSearch.disabled = false;
   showGameActions(false);
 
@@ -284,16 +303,25 @@ function onGameStart(payload) {
   notifier.clear();
 
   const youAreBlack = session.color === BLACK;
-  el.scoreBlackName.textContent = youAreBlack ? `${session.name} (du)` : payload.opponentName;
-  el.scoreWhiteName.textContent = youAreBlack ? payload.opponentName : `${session.name} (du)`;
+  score.setPlayers({
+    me: session.color,
+    myName: session.name,
+    opponentName: payload.opponentName,
+  });
 
   for (const node of document.querySelectorAll('[data-turn-seconds]')) {
     node.textContent = String(Math.round(payload.state.turnMs / 1000));
   }
 
-  if (el.result.open) el.result.close();
+  // Offene Fenster schließen: Hinter dem Einstellungsfenster bliebe der
+  // Spielstart unbemerkt, während die eigene Bedenkzeit schon läuft.
+  if (el.settingsDialog.open) el.settingsDialog.close();
+  result.close();
   showScreen('game');
   onState(payload.state);
+  // Tastaturnutzer sollen gleich auf dem Brett weitermachen können, statt
+  // vom Seitenanfang aus hinzunavigieren.
+  boardView.focus();
 
   notify({
     text: youAreBlack
@@ -311,6 +339,7 @@ function onState(state) {
   // einer Ablehnung – dann soll der Grund stehen bleiben.
   if ((state.events ?? []).length > 0) session.rejection = '';
   session.lastState = state;
+  session.receivedAt = Date.now();
   renderState(state);
 
   const ctx = perspective();
@@ -321,68 +350,49 @@ function onState(state) {
 }
 
 function renderState(state) {
+  const playing = flow.playing && !state.finished;
   boardView.render(state, { allowAny: settings.get('moveHints') === 'off' });
-
-  const black = state.scores[BLACK];
-  const white = state.scores[WHITE];
-  el.scoreBlackValue.textContent = String(black);
-  el.scoreWhiteValue.textContent = String(white);
-  // Anteil von Schwarz an den gesetzten Steinen: zeigt das Verhältnis der
-  // beiden Farben zueinander, nicht die Füllung des Bretts.
-  el.tallyBlack.style.width = `${(black / (black + white)) * 100}%`;
-  el.scoreBlack.dataset.active = String(!state.finished && state.currentPlayer === BLACK);
-  el.scoreWhite.dataset.active = String(!state.finished && state.currentPlayer === WHITE);
-
-  const opponent = session.names[opponentOf(session.color)] ?? 'Dein Gegner';
-
-  if (state.finished) {
-    el.turn.textContent = 'Partie beendet.';
-    el.hint.textContent = '';
-    clock.stop();
-  } else {
-    el.turn.textContent = state.yourTurn ? 'Du bist am Zug.' : `${opponent} ist am Zug.`;
-    clock.start(
-      state.remainingMs,
-      state.turnMs,
-      state.yourTurn,
-      state.yourTurn ? 'Deine Bedenkzeit' : `Bedenkzeit von ${opponent}`,
-    );
-
-    // Bleibt stehen, bis der nächste Zug kommt – anders als die
-    // Einblendung, die nach ein paar Sekunden verschwindet.
-    if (session.rejection) {
-      el.hint.textContent = session.rejection;
-    } else if (state.passedLast) {
-      el.hint.textContent = state.yourTurn
-        ? `${opponent} hat keinen erlaubten Zug und setzt aus. Du bist noch einmal dran.`
-        : `Du hast keinen erlaubten Zug und setzt aus. ${opponent} ist noch einmal dran.`;
-    } else {
-      el.hint.textContent = '';
-    }
-  }
-
-  renderStrikes(state, opponent);
+  const shown = score.render(state, { playing, rejection: session.rejection });
   moveLog.render(state.history ?? [], perspective());
-}
 
-function renderStrikes(state, opponent) {
-  const { mine, opponent: theirs } = state.timeouts ?? { mine: 0, opponent: 0 };
-  const lines = [];
-  if (mine > 0) {
-    lines.push(`Du hast ${mine} von ${state.maxTimeouts} Zeitüberschreitungen in Folge.`);
+  // Neu ansagen, was sich geändert hat – das Neuzeichnen nach einer
+  // Einstellung allein nicht. Zusammen mit den Hinweisen aus onState wird
+  // daraus eine Ansage (notices.js).
+  if (shown.turn !== session.spokenTurn) {
+    session.spokenTurn = shown.turn;
+    notifier.say(shown.turn);
   }
-  if (theirs > 0) {
-    lines.push(`${opponent}: ${theirs} von ${state.maxTimeouts} Zeitüberschreitungen in Folge.`);
+  if (shown.strikes !== session.spokenStrikes) {
+    session.spokenStrikes = shown.strikes;
+    notifier.say(shown.strikes);
   }
-  el.strikes.textContent = lines.join(' ');
-  el.strikes.hidden = lines.length === 0;
+
+  // Auch ein Zustand, der noch "läuft" sagt, startet nach dem Ende keine
+  // Uhr mehr (z. B. beim Neuzeichnen nach einer Einstellung).
+  if (!playing) {
+    clock.stop();
+    return;
+  }
+  const opponent = session.names[opponentOf(session.color)] ?? 'Dein Gegner';
+  // remainingMs ist eine Momentaufnahme vom Empfang. Wird derselbe
+  // Zustand später neu gezeichnet (Einstellung geändert), ist seitdem
+  // Zeit vergangen. Ohne Abzug spränge die Uhr zurück.
+  const elapsed = Date.now() - session.receivedAt;
+  clock.start(
+    Math.max(0, state.remainingMs - elapsed),
+    state.turnMs,
+    state.yourTurn,
+    state.yourTurn ? 'Deine Bedenkzeit' : `Bedenkzeit von ${opponent}`,
+  );
 }
 
 function onRejected(payload) {
   const text = payload?.message ?? 'Dieser Zug ist nicht erlaubt.';
-  // Angezeigt wird der Grund beim Rendern des korrigierten Zustands,
-  // der direkt nach der Ablehnung kommt.
+  // Der Grund bleibt unter dem Brett stehen, bis der nächste Zug kommt.
+  // Sofort neu zeichnen: Der Server schickt den korrigierten Zustand nicht
+  // nach jeder Ablehnung mit, sondern höchstens einmal pro Sekunde.
   session.rejection = text;
+  if (session.lastState && flow.playing) renderState(session.lastState);
   notify({ text, tone: 'bad', importance: 'critical' });
 }
 
@@ -405,9 +415,21 @@ function onErrorMessage(payload) {
   });
 }
 
+/**
+ * Schließt den zuletzt gezeigten Zustand ab. Bei Abbruch oder
+ * Verbindungsverlust kommt vom Server kein Endzustand mehr; ohne diesen
+ * Schritt blieben die letzten erlaubten Felder anklickbar.
+ */
+function freezeBoard() {
+  if (!session.lastState) return;
+  session.lastState = { ...session.lastState, finished: true, yourTurn: false, legalMoves: [] };
+  renderState(session.lastState);
+}
+
 function onGameOver(payload) {
   if (!flow.endGame()) return;
   clock.stop();
+  freezeBoard();
   disarmResign();
   showGameActions(true);
   updateTitle();
@@ -425,17 +447,18 @@ function onGameOver(payload) {
   let title = 'Unentschieden';
   if (!payload.draw) title = payload.youWon ? 'Du gewinnst' : 'Du verlierst';
 
-  const yours = session.color === BLACK ? payload.scores.black : payload.scores.white;
-  const theirs = session.color === BLACK ? payload.scores.white : payload.scores.black;
+  const yours = payload.scores[sideName(session.color)];
+  const theirs = payload.scores[sideName(opponentOf(session.color))];
   const detail = `${yours} zu ${theirs} Steine.`;
 
   // Kurz warten, damit die letzten Steine sichtbar fertig drehen, bevor
   // das Ergebnis darüber liegt.
   clearTimeout(session.resultTimer);
-  session.resultTimer = setTimeout(
-    () => showResult(title, endReasonText(payload, ctx), detail),
-    900,
-  );
+  session.resultTimer = setTimeout(() => {
+    session.resultTimer = null;
+    // Nur, wenn das Fenster noch bei genau dieser beendeten Partie ist.
+    if (flow.phase === 'over') showResult(title, endReasonText(payload, ctx), detail);
+  }, 900);
 }
 
 /**
@@ -453,6 +476,7 @@ function onConnectionLost() {
   // Der Server beendet beim Verbindungsabbruch Partie und Warteplatz.
   // Der Client zieht hier nur nach.
   if (flow.endGame()) {
+    freezeBoard();
     disarmResign();
     showGameActions(true);
     showResult(
@@ -483,7 +507,8 @@ function onConnected() {
 
 function updateTitle() {
   const myTurn = flow.playing && session.lastState?.yourTurn;
-  document.title = myTurn && document.hidden ? '● Du bist am Zug – Reversi' : 'Reversi';
+  // Nur Wörter: Ein Zeichen wie "●" läsen Screenreader als "schwarzer Kreis" vor.
+  document.title = myTurn && document.hidden ? 'Du bist am Zug, Reversi' : 'Reversi';
 }
 
 document.addEventListener('visibilitychange', updateTitle);

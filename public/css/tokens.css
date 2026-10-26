@@ -5,48 +5,70 @@
    danach ist die Reihenfolge der übrigen Dateien egal, und Regeln können
    sich nicht überraschend gegenseitig überschreiben.
 
+   Farben: alle in oklch(L C H) – L ist die wahrgenommene Helligkeit
+   (0 bis 1), C die Sättigung, H der Farbton in Grad. Anders als bei Hex
+   lässt sich an L direkt ablesen, ob eine Farbe heller oder dunkler ist,
+   und eine Änderung von L verschiebt den Farbton nicht. Farben, die mehrere
+   Rollen haben, stehen einmal als Grundfarbe; die Rollen verweisen darauf.
+   Die Kontrastwerte in den Kommentaren gelten für die Farbe auf der
+   Spielfläche bzw. der Fläche, die daneben genannt ist.
+
    Einheiten: rem für Schriftgrößen, Abstände, Radien und Größen, auch in
    Medien- und Container-Abfragen. px nur für Linienstärken (1–2px),
    Schatten und die 3D-Perspektive – Werte, die nicht mit der Schriftgröße
    wachsen sollen. */
-@layer tokens, base, layout, board, components, dialogs;
+@layer tokens, base, layout, board, components, dialogs, state;
 
 @layer tokens {
   :root {
+    /* --- Grundfarben mit mehreren Rollen ------------------------------ */
+    --paper: oklch(0.952 0.012 91.5); /* Karten, weiße Seite auf Filz */
+    /* Hauptknopf und Filz. Steht zusätzlich als #33463c in index.html
+       (theme-color) und manifest.webmanifest, die kein CSS lesen können. */
+    --forest: oklch(0.375 0.03 161.6);
+    --ink: oklch(0.24 0.013 150.1); /* Text, dunkler Fokusring */
+    --white: oklch(1 0 0);
+    --brass-light: oklch(0.795 0.121 81.7); /* Warnring, Marker auf Marine */
+
     /* --- Übriges Farbschema ----------------------------------------- */
-    --c-table: #b8bfb2;
-    --c-table-deep: #a4ac9d;
-    --c-panel: #f2efe6;
-    --c-panel-sunk: #e9e5d8;
-    --c-panel-raised: #fbf9f4; /* Hinweise am Rand */
-    --c-highlight: #fffdf6; /* ausgewählte Karte, wer am Zug ist */
-    --c-field: #fff; /* Eingabefelder */
-    --c-border: #c6c1b2; /* Rahmen von Feldern und leisen Knöpfen */
-    --c-line: #d8d3c4; /* Trennlinien */
-    --c-accent: #b07c2a; /* Fokus, aktive Auswahl */
-    --c-primary: #33463c; /* Hauptknopf */
-    --c-text: #1b211c;
-    --c-text-quiet: #4e574e;
-    --c-error: #8c3320;
-    --c-warn: #9a5b00;
-    --c-good: #2f6b3f;
+    --c-table: oklch(0.795 0.02 130.2);
+    --c-table-deep: oklch(0.734 0.023 130.1);
+    --c-panel: var(--paper);
+    --c-panel-sunk: oklch(0.921 0.018 92.7);
+    --c-panel-raised: oklch(0.982 0.007 88.6); /* Hinweise am Rand */
+    --c-highlight: oklch(0.994 0.009 93.6); /* ausgewählte Karte, wer am Zug ist */
+    --c-field: var(--white); /* Eingabefelder */
+    --c-border: oklch(0.624 0.015 88.7); /* Rahmen von Feldern und leisen Knöpfen, ≥ 3:1 */
+    --c-line: oklch(0.867 0.021 91.6); /* Trennlinien */
+    --c-accent: oklch(0.454 0.081 74.3); /* Fokus, aktive Auswahl; ≥ 3:1 auf Panel und Tisch */
+    /* Fokus auf dem Brett: zwei Ringe, damit einer davon auf jeder
+       Brettfarbe mindestens 3:1 erreicht (board.css). */
+    --c-focus-light: var(--white);
+    --c-focus-dark: var(--ink);
+    --c-primary: var(--forest); /* Hauptknopf */
+    --c-text: var(--ink);
+    --c-text-quiet: oklch(0.446 0.018 145.3);
+    --c-error: oklch(0.446 0.125 33.7);
+    --c-warn: oklch(0.515 0.116 64.9);
+    --c-good: oklch(0.476 0.094 150.1);
 
     /* Einblendung über dem Brett: dunkel, mit farbigem Ring je Ton. Die
        Ringe sind hellere Fassungen von Fehler, Warnung und Erfolg, weil
        sie auf dunklem Grund stehen. */
-    --c-overlay: rgb(20 24 21 / 90%);
+    --c-overlay: oklch(0.204 0.008 153.1 / 90%);
     --c-on-overlay: var(--c-panel-raised);
-    --c-ring-bad: #e0806a;
-    --c-ring-warn: #e3b45a;
-    --c-ring-good: #8cc49a;
-    --c-backdrop: rgb(26 30 27 / 50%);
+    --c-ring-bad: oklch(0.699 0.124 33.9);
+    --c-ring-warn: var(--brass-light);
+    --c-ring-good: oklch(0.77 0.084 151.9);
+    --c-backdrop: oklch(0.23 0.008 153.3 / 50%);
 
     /* Typografie. Bewusst nur Systemschriften: das Projekt muss auf
        einem fremden Rechner ohne Netzzugang laufen. */
     --font-ui: ui-sans-serif, system-ui, 'Segoe UI', roboto, helvetica, arial, sans-serif;
     --font-num: ui-monospace, 'SF Mono', 'Cascadia Mono', menlo, consolas, monospace;
-    --step-minus-2: 0.75rem;
-    --step-minus-1: 0.8125rem;
+    /* Kleinste Stufe ist 1rem (16 px). Kleinere Texte (Erläuterungen,
+       Zugverlauf, Hinweise) unterscheiden sich über Farbe und Gewicht,
+       nicht über die Größe. */
     --step-0: 1rem;
     --step-1: 1.25rem;
     --step-2: 1.75rem;
@@ -71,9 +93,22 @@
     --radius-lg: 0.5rem;
     --radius-xl: 0.75rem;
     --radius-round: 999px;
-    --shadow-panel: 0 1px 2px rgb(0 0 0 / 12%), 0 8px 24px rgb(0 0 0 / 10%);
-    --shadow-disc: 0 1px 2px rgb(0 0 0 / 45%);
-    --shadow-float: 0 8px 30px rgb(0 0 0 / 35%);
+    --shadow-panel: 0 1px 2px oklch(0 0 0 / 12%), 0 8px 24px oklch(0 0 0 / 10%);
+    --shadow-disc: 0 1px 2px oklch(0 0 0 / 45%);
+    --shadow-float: 0 8px 30px oklch(0 0 0 / 35%);
+    --shadow-dialog: 0 20px 60px oklch(0 0 0 / 35%);
+
+    /* Leichte Abdunkelung beim Überfahren und Ränder auf heller Fläche. */
+    --c-hover-tint: oklch(0 0 0 / 6%);
+    --c-edge-soft: oklch(0 0 0 / 20%); /* Rand des Balkens */
+    --c-edge-strong: oklch(0 0 0 / 50%); /* Rand der kleinen Steine, ≥ 3:1 auf der Karte */
+    --c-edge-disc: oklch(0 0 0 / 28%); /* Rand heller Steine auf dunklem Brett */
+
+    /* Fokusring für alles außerhalb des Bretts. Er steht an mehreren
+       Stellen, weil "all: unset" ihn zurücksetzt oder der Fokus am
+       Elternelement gezeigt wird; der Wert steht nur hier. */
+    --focus-outline: 2px solid var(--c-accent);
+    --focus-offset: 2px;
 
     /* Bewegung. Alle Dauern hängen an --motion: 1 = normal, 0 = aus.
        Damit reichen eine Zeile für "Animationen reduzieren" und eine für
@@ -84,6 +119,38 @@
     --flip-stagger: calc(55ms * var(--motion));
     --ease-flip: cubic-bezier(0.32, 0.72, 0.3, 1);
     --fade: calc(180ms * var(--motion));
+
+    /* --- Steine ---------------------------------------------------------
+       Eigene Farben aus den Einstellungen setzt settings.js als
+       --user-stone-b / --user-stone-w. Fehlen sie, gilt die Brettfarbe.
+       Glanzlicht und Schattenseite werden per color-mix() aus der
+       Grundfarbe abgeleitet – so funktioniert jede Farbe, ohne dass für
+       jede ein eigener Verlauf gepflegt werden muss. var() wird erst beim
+       Berechnen aufgelöst, deshalb dürfen --c-ink und --c-bone weiter unten
+       bei den Brettvarianten stehen. */
+    --stone-b: var(--user-stone-b, var(--c-ink));
+    --stone-w: var(--user-stone-w, var(--c-bone));
+    --stone-b-hi: color-mix(in oklab, var(--stone-b) 78%, white);
+    --stone-b-lo: color-mix(in oklab, var(--stone-b) 80%, black);
+    --stone-w-hi: color-mix(in oklab, var(--stone-w) 70%, white);
+    --stone-w-lo: color-mix(in oklab, var(--stone-w) 86%, black);
+    --stone-b-mark: var(--user-mark-b, var(--c-bone));
+    --stone-w-mark: var(--user-mark-w, var(--c-ink));
+
+    /* Die Oberfläche der Steine, einmal für Brett, Punktestand und
+       Vorschau: Glanzlicht oben links, zum Rand hin dunkler. */
+    --stone-b-face: radial-gradient(
+      circle at 34% 28%,
+      var(--stone-b-hi),
+      var(--stone-b) 55%,
+      var(--stone-b-lo)
+    );
+    --stone-w-face: radial-gradient(
+      circle at 34% 28%,
+      var(--stone-w-hi),
+      var(--stone-w) 55%,
+      var(--stone-w-lo)
+    );
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -104,69 +171,72 @@
      eigenen Farben, ohne dass sie ein zweites Mal im CSS stehen. */
   :root,
   [data-board='felt'] {
-    --c-felt: #33463c; /* Spielfläche */
-    --c-felt-line: #22302a; /* Gitterlinien */
-    --c-ink: #1a1e1b; /* Standardfarbe der schwarzen Seite */
-    --c-bone: #f2efe6; /* Standardfarbe der weißen Seite */
-    --c-frame-top: #6d5a3e; /* Rahmen um das Brett */
-    --c-frame-bottom: #55452e;
-    --c-marker: #b07c2a; /* Ringe für erlaubte Züge */
-    --c-marker-soft: #d8b273; /* letzter Zug, Eckpunkte, Koordinaten */
+    --c-felt: var(--forest); /* Spielfläche */
+    --c-felt-line: oklch(0.294 0.022 166.7); /* Linie um das ganze Brett */
+    /* Kontrastwerte zur Spielfläche stehen jeweils dahinter. Ziel: 3:1 für
+       Linien, Ringe und Markierungen (WCAG 1.4.11), 4,5:1 für Text. */
+    --c-grid: oklch(0.643 0.016 162.2); /* Gitterlinien, 3,05:1 */
+    --c-marker-text: var(--c-marker-soft); /* Ziffern im Modus "Ringe mit Anzahl", 5,06:1 */
+    --c-ink: oklch(0.23 0.008 153.3); /* Standardfarbe der schwarzen Seite */
+    --c-bone: var(--paper); /* Standardfarbe der weißen Seite */
+    --c-frame-top: oklch(0.479 0.048 76.9); /* Rahmen um das Brett */
+    --c-frame-bottom: oklch(0.401 0.042 76.1);
+    --c-marker: oklch(0.653 0.109 75.8); /* Ringe für erlaubte Züge, 3,10:1 */
+    --c-marker-soft: oklch(0.783 0.092 79.4); /* letzter Zug und Eckpunkte, 5,06:1 */
+
+    /* Rand der Steine. Ein Stein muss sich mit mindestens 3:1 vom Brett
+       abheben (WCAG 1.4.11). Dunkle Steine auf dunklem Brett bekommen
+       deshalb einen hellen Rand, helle Steine auf hellem Brett einen
+       dunklen. */
+    --stone-edge-b: oklch(0.691 0.003 165);
+    --stone-edge-w: var(--c-edge-disc);
   }
 
   [data-board='wood'] {
-    --c-felt: #b98b57;
-    --c-felt-line: #4a3118;
-    --c-ink: #241c14;
-    --c-bone: #faf5e9;
-    --c-frame-top: #5c4630;
-    --c-frame-bottom: #45341f;
+    --c-felt: oklch(0.67 0.089 68.7);
+    --c-felt-line: oklch(0.337 0.053 64.3);
+    --c-grid: var(--c-felt-line); /* 3,95:1 */
+    --c-marker-text: oklch(0.293 0.056 72.7); /* 4,62:1 */
+    --c-ink: oklch(0.233 0.019 66.6);
+    --c-bone: oklch(0.971 0.017 88);
+    --c-frame-top: oklch(0.412 0.045 66);
+    --c-frame-bottom: oklch(0.338 0.041 71.6);
 
     /* Auf hellem Holz geht helles Messing unter, deshalb dunkle Bronze. */
-    --c-marker: #5f3f0f;
-    --c-marker-soft: #7a531a;
+    --c-marker: oklch(0.395 0.075 72.4); /* 3,13:1 */
+    --c-marker-soft: oklch(0.397 0.072 73); /* 3,11:1 */
+    --stone-edge-b: var(--c-edge-disc);
+    --stone-edge-w: oklch(0.353 0.006 78.3);
   }
 
   [data-board='marine'] {
-    --c-felt: #1f4e63;
-    --c-felt-line: #133444;
-    --c-ink: #121a1f;
-    --c-bone: #f4f1ea;
-    --c-frame-top: #3b4650;
-    --c-frame-bottom: #2a333b;
-    --c-marker: #e3b45a;
-    --c-marker-soft: #f0cf8a;
+    --c-felt: oklch(0.401 0.062 230.3);
+    --c-felt-line: oklch(0.309 0.048 232.3);
+    --c-grid: oklch(0.67 0.035 226.6); /* 3,04:1 */
+    --c-marker-text: var(--c-marker); /* 4,70:1 */
+    --c-ink: oklch(0.212 0.015 235.9);
+    --c-bone: oklch(0.959 0.01 87.5);
+    --c-frame-top: oklch(0.388 0.022 245.8);
+    --c-frame-bottom: oklch(0.316 0.019 245.3);
+    --c-marker: var(--brass-light); /* 4,70:1 */
+    --c-marker-soft: oklch(0.867 0.095 85); /* 6,01:1 */
+    --stone-edge-b: oklch(0.716 0.005 228.8);
   }
 
   /* Erhöhte Unterscheidbarkeit: reines Schwarz gegen reines Weiß auf
      mittlerem Grau, damit beide Steinfarben deutlich gegen das Brett
      stehen und nicht nur gegeneinander. */
   [data-board='contrast'] {
-    --c-felt: #4d5358;
-    --c-felt-line: #23272a;
-    --c-ink: #000;
-    --c-bone: #fff;
-    --c-frame-top: #2b2f32;
-    --c-frame-bottom: #1c1f21;
-    --c-marker: #ffc043;
-    --c-marker-soft: #ffd67d;
-  }
-
-  /* --- Steine ---------------------------------------------------------
-     Eigene Farben aus den Einstellungen setzt settings.js als
-     --user-stone-b / --user-stone-w. Fehlen sie, gilt die Brettfarbe.
-     Glanzlicht und Schattenseite werden per color-mix() aus der
-     Grundfarbe abgeleitet – so funktioniert jede Farbe, ohne dass für
-     jede ein eigener Verlauf gepflegt werden muss. Steht nach den
-     Brettvarianten, weil es deren --c-ink und --c-bone verwendet. */
-  :root {
-    --stone-b: var(--user-stone-b, var(--c-ink));
-    --stone-w: var(--user-stone-w, var(--c-bone));
-    --stone-b-hi: color-mix(in oklab, var(--stone-b) 78%, white);
-    --stone-b-lo: color-mix(in oklab, var(--stone-b) 80%, black);
-    --stone-w-hi: color-mix(in oklab, var(--stone-w) 70%, white);
-    --stone-w-lo: color-mix(in oklab, var(--stone-w) 86%, black);
-    --stone-b-mark: var(--user-mark-b, var(--c-bone));
-    --stone-w-mark: var(--user-mark-w, var(--c-ink));
+    --c-felt: oklch(0.439 0.011 243);
+    --c-felt-line: oklch(0.27 0.008 240.2);
+    --c-grid: oklch(0.711 0.006 247.9); /* 3,04:1 */
+    --c-marker-text: var(--c-marker); /* 4,78:1 */
+    --c-ink: oklch(0 0 0);
+    --c-bone: var(--white);
+    --c-frame-top: oklch(0.302 0.008 240.1);
+    --c-frame-bottom: oklch(0.237 0.006 236.8);
+    --c-marker: oklch(0.845 0.153 80.6); /* 4,78:1 */
+    --c-marker-soft: oklch(0.893 0.117 85.3); /* 5,63:1 */
+    --stone-edge-b: oklch(0.757 0 0);
   }
 }

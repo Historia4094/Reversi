@@ -61,8 +61,8 @@
 
   /* Sichtbarer Fokus ist Pflicht, nicht Kosmetik. */
   :focus-visible {
-    outline: 2px solid var(--c-accent);
-    outline-offset: 2px;
+    outline: var(--focus-outline);
+    outline-offset: var(--focus-offset);
   }
 
   .visually-hidden {
@@ -75,11 +75,14 @@
     clip-path: inset(50%);
     white-space: nowrap;
   }
+}
 
-  /* Das hidden-Attribut muss gegen display-Angaben aus späteren Layern
-     gewinnen. !important in einem frühen Layer ist genau dafür gedacht:
-     wichtige Deklarationen kehren die Layer-Reihenfolge um. */
+/* Das hidden-Attribut muss gegen display-Angaben aus späteren Layern
+   gewinnen (.screen--centered, .game, .clock). Deshalb ein eigener Layer,
+   der als letzter in der Reihenfolge steht (tokens.css): Normale Angaben
+   späterer Layer gewinnen, !important ist dafür nicht nötig. */
+@layer state {
   [hidden] {
-    display: none !important;
+    display: none;
   }
 }

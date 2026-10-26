@@ -10,7 +10,7 @@ import { readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 
-const folders = ['server', 'public/js', 'scripts'];
+const folders = ['server', 'public/js', 'public/shared', 'scripts'];
 let count = 0;
 
 for (const folder of folders) {

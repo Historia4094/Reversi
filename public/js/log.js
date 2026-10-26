@@ -7,7 +7,7 @@
  * Scrollposition erhalten.
  */
 
-import { BLACK, squareName } from './constants.js';
+import { sideName, squareName } from '../shared/constants.js';
 
 export class MoveLog {
   /**
@@ -47,7 +47,7 @@ export class MoveLog {
 
     const stone = document.createElement('span');
     stone.className = 'stone-badge stone-badge--small';
-    stone.dataset.side = entry.player === BLACK ? 'black' : 'white';
+    stone.dataset.side = sideName(entry.player);
     stone.setAttribute('aria-hidden', 'true');
 
     const who = entry.player === me ? 'Du' : names[entry.player];

@@ -17,11 +17,13 @@
 
 import {
   STONE_COLORS,
-  DEFAULT_STONE,
+  edgeColorFor,
   markColorFor,
   resolveStones,
+  toHex,
   WEAK_CONTRAST_RATIO,
 } from './colors.js';
+import { otherSide } from '../shared/constants.js';
 
 // v2: Werte seit Version 1.3 englisch (felt statt filz …). Alte
 // Einstellungen unter v1 werden dadurch einfach nicht mehr gelesen.
@@ -51,7 +53,10 @@ const ALLOWED = {
 };
 
 function isValid(key, value) {
-  if (!(key in DEFAULTS)) return false;
+  // Object.hasOwn statt "key in DEFAULTS": "in" prüft auch geerbte
+  // Eigenschaften. Ein gespeicherter Schlüssel "toString" gälte sonst als
+  // bekannte Einstellung.
+  if (!Object.hasOwn(DEFAULTS, key)) return false;
   if (typeof DEFAULTS[key] === 'boolean') return typeof value === 'boolean';
   return ALLOWED[key]?.includes(value) ?? false;
 }
@@ -61,13 +66,18 @@ function isValid(key, value) {
  * gesperrt sein (privates Fenster) – dann gelten einfach die Vorgaben.
  */
 function load() {
+  let parsed;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : {};
-    return Object.fromEntries(Object.entries(parsed).filter(([key, value]) => isValid(key, value)));
-  } catch {
+    parsed = raw ? JSON.parse(raw) : {};
+  } catch (error) {
+    console.warn('Gespeicherte Einstellungen nicht lesbar, es gelten die Vorgaben.', error);
     return {};
   }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+  // Jeder Eintrag wird einzeln geprüft. Ein ungültiger Wert kostet nur
+  // diesen einen Eintrag, nicht alle Einstellungen.
+  return Object.fromEntries(Object.entries(parsed).filter(([key, value]) => isValid(key, value)));
 }
 
 function save(values) {
@@ -126,7 +136,7 @@ export class Settings {
 
     for (const control of scope.querySelectorAll('[data-setting]')) {
       const key = control.dataset.setting;
-      if (!(key in DEFAULTS)) continue;
+      if (!Object.hasOwn(DEFAULTS, key)) continue;
       this.controls.push(control);
       control.addEventListener('change', () => {
         if (control.type === 'checkbox') this.set(key, control.checked);
@@ -163,10 +173,13 @@ export class Settings {
     dataset.lastMove = v.lastMove ? 'on' : 'off';
     dataset.coords = v.coords ? 'on' : 'off';
 
+    const sides = this.boardSides();
+    const board = this.boardColor();
     const stones = resolveStones({
       mine: v.stoneMine,
       opponent: v.stoneOpponent,
       myColor: this.myColor,
+      sides,
     });
 
     // null = Standardfarbe des Bretts. Dann bleibt die Variable leer und
@@ -176,6 +189,7 @@ export class Settings {
       ['white', 'w'],
     ]) {
       const hex = stones[side];
+      const edge = hex ? edgeColorFor(hex, board, sides) : null;
       if (hex) {
         style.setProperty(`--user-stone-${short}`, hex);
         style.setProperty(`--user-mark-${short}`, markColorFor(hex));
@@ -183,14 +197,33 @@ export class Settings {
         style.removeProperty(`--user-stone-${short}`);
         style.removeProperty(`--user-mark-${short}`);
       }
+      // Eigener Rand nur, wenn sich der Stein sonst kaum vom Brett abhebt.
+      if (edge) style.setProperty(`--user-edge-${short}`, edge);
+      else style.removeProperty(`--user-edge-${short}`);
     }
 
-    this.updatePreview(stones);
+    this.updatePreview(stones, sides);
+  }
+
+  /**
+   * Standardfarben der beiden Seiten auf dem gewählten Brett, gelesen aus
+   * tokens.css. So stehen sie nur dort, und die Kontrastprüfung rechnet
+   * mit den Farben des tatsächlich gewählten Bretts.
+   */
+  boardSides() {
+    const style = getComputedStyle(this.root);
+    const read = (name, fallback) => toHex(style.getPropertyValue(name)) ?? fallback;
+    return { black: read('--c-ink', '#000000'), white: read('--c-bone', '#ffffff') };
+  }
+
+  /** Farbe der Spielfläche als Hex, aus tokens.css; null, wenn unbekannt. */
+  boardColor() {
+    return toHex(getComputedStyle(this.root).getPropertyValue('--c-felt'));
   }
 
   /** Vorschau und Warnhinweis im Einstellungsfenster. */
-  updatePreview(stones) {
-    const theirs = this.myColor === 'black' ? 'white' : 'black';
+  updatePreview(stones, sides) {
+    const theirs = otherSide(this.myColor);
     for (const node of document.querySelectorAll('[data-stone-preview="mine"]')) {
       node.dataset.side = this.myColor;
     }
@@ -203,7 +236,7 @@ export class Settings {
 
     let message = '';
     if (stones.adjusted) {
-      const fallback = stones[theirs] === DEFAULT_STONE.black ? 'Schwarz' : 'Weiß';
+      const fallback = stones[theirs] === sides.black ? 'Schwarz' : 'Weiß';
       message = `Beide Steine hätten dieselbe Farbe. Der Gegner wird deshalb in ${fallback} angezeigt.`;
     } else if (stones.ratio < WEAK_CONTRAST_RATIO && !this.values.symbols) {
       message =
