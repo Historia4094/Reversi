@@ -23,7 +23,7 @@ Danach `http://localhost:3000` in zwei Browserfenstern öffnen.
 
 Zwei Browserfenster bei 1024×768: Christa spielt gegen Bruno. Jeder kann sein eigenes Brett wählen, Bruno spielt hier auf Holz.
 
-**Anmelden, Brett wählen, auf einen Gegner warten**
+**Anmelden, Brett wählen, auf einen Gegner warten.** Der Name braucht mindestens zwei Buchstaben. Nur Satzzeichen wie „.“ oder „-“ werden abgelehnt, im Browser und auf dem Server. Im Namensfeld steht bei jedem Laden ein anderer Beispielname.
 
 ![Anmeldung](docs/screenshots/01-anmeldung.png)
 ![Brettwahl](docs/screenshots/02-brettwahl.png)
@@ -62,13 +62,13 @@ Zwei Browserfenster bei 1024×768: Christa spielt gegen Bruno. Jeder kann sein e
 
 ![Gegner hat die Partie verlassen](docs/screenshots/12-gegner-weg.png)
 
-**Bedenkzeit.** Für diese Bilder wurde die Bedenkzeit auf 8 Sekunden gesetzt (`TURN_SECONDS=8`), normal sind es 60. In den letzten Sekunden wird die eigene Uhr rot. Läuft sie ab, setzt der Server einen zufälligen erlaubten Stein. Beim dritten Mal hintereinander gilt die Partie als aufgegeben.
+**Bedenkzeit.** Für diese Bilder wurde die Bedenkzeit auf 8 Sekunden gesetzt (`TURN_SECONDS=8`), normal sind es 60. In den letzten Sekunden wird die eigene Uhr rot. Läuft sie ab, setzt der Server einen zufälligen erlaubten Stein. Beim dritten Mal hintereinander gilt die Partie als aufgegeben. Die Warnung kommt 15 Sekunden vor Ablauf. Ist die Bedenkzeit selbst 15 Sekunden oder kürzer, kommt sie zur Hälfte der Zeit, bei 8 Sekunden also nach 4 Sekunden.
 
 ![Bedenkzeit läuft ab](docs/screenshots/13-bedenkzeit.png)
 ![Zeit abgelaufen](docs/screenshots/14-zeit-abgelaufen.png)
 ![Aufgabe nach drei Zeitüberschreitungen](docs/screenshots/15-aufgabe-zeit.png)
 
-**Farbsehschwäche.** Eigene Steinfarben, Symbole auf den Steinen (Punkt und Kreuz) und Koordinaten am Rand.
+**Farbsehschwäche.** Eigene Steinfarben, Symbole auf den Steinen (Punkt und Kreuz) und Koordinaten am Rand. Eigene Farben bekommen auf jedem Brett einen passenden Rand, damit sich jeder Stein mit mindestens 3:1 vom Brett abhebt, zum Beispiel Orange auf Holz.
 
 ![Symbole und eigene Farben](docs/screenshots/16-farbenblind.png)
 
