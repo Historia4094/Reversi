@@ -153,3 +153,93 @@ test('Perspektive: Vorschau zeigt meine und die Gegnerseite, schwacher Kontrast 
   settings.set('stoneOpponent', 'white');
   assert.match(document.getElementById('stone-warning').textContent, /in Schwarz angezeigt/);
 });
+
+test('Jede Einstellung, die kein Schalter ist, hat eine Liste erlaubter Werte', () => {
+  // isValid() verlässt sich darauf; eine neue Einstellung ohne Liste
+  // fiele sonst erst beim Laden auf.
+  const settings = new Settings();
+  for (const [key, value] of Object.entries(DEFAULTS)) {
+    if (typeof value === 'boolean') continue;
+    settings.set(key, value);
+    assert.equal(settings.get(key), value, key);
+  }
+});
+
+test('reset meldet allen Zuhörern die Änderung; abgemeldete hören nichts mehr', () => {
+  const settings = new Settings();
+  const heard = [];
+  const stop = settings.onChange((key, value) => heard.push([key, value]));
+  settings.reset();
+  assert.deepEqual(heard, [['*', null]]);
+  stop();
+  settings.set('coords', true);
+  assert.deepEqual(heard, [['*', null]]);
+});
+
+test('Auswahlfelder, Optionsknöpfe und Schalter schreiben ihren Wert', () => {
+  document.body.insertAdjacentHTML(
+    'beforeend',
+    `<div id="form">
+       <select data-setting="notices">
+         <option value="all">alle</option><option value="important">wichtig</option>
+       </select>
+       <input type="radio" name="hints" value="rings" data-setting="moveHints">
+       <input type="radio" name="hints" value="off" data-setting="moveHints">
+       <input type="checkbox" data-setting="reduceMotion">
+       <input type="checkbox" data-setting="lastMove">
+     </div>`,
+  );
+  const form = document.getElementById('form');
+  const settings = new Settings();
+  settings.bind(form);
+  const [rings, off] = form.querySelectorAll('[type=radio]');
+  assert.equal(rings.checked, true, 'sync setzt den passenden Optionsknopf');
+
+  const select = form.querySelector('select');
+  select.value = 'important';
+  select.dispatchEvent(new window.Event('change'));
+  assert.equal(settings.get('notices'), 'important');
+
+  // Ein Optionsknopf, der gerade abgewählt wurde, ändert nichts.
+  rings.checked = false;
+  rings.dispatchEvent(new window.Event('change'));
+  assert.equal(settings.get('moveHints'), 'rings');
+  off.checked = true;
+  off.dispatchEvent(new window.Event('change'));
+  assert.equal(settings.get('moveHints'), 'off');
+
+  const [motion, lastMove] = form.querySelectorAll('[type=checkbox]');
+  motion.checked = true;
+  motion.dispatchEvent(new window.Event('change'));
+  lastMove.checked = false;
+  lastMove.dispatchEvent(new window.Event('change'));
+  assert.equal(document.documentElement.dataset.motion, 'reduced');
+  assert.equal(document.documentElement.dataset.lastMove, 'off');
+  form.remove();
+});
+
+test('Ohne Farben im CSS gelten Schwarz und Weiß als Seitenfarben', () => {
+  const style = document.querySelector('style');
+  const css = style.textContent;
+  style.textContent = '';
+  try {
+    const settings = new Settings();
+    assert.deepEqual(settings.boardSides(), { black: '#000000', white: '#ffffff' });
+    assert.equal(settings.boardColor(), null);
+  } finally {
+    style.textContent = css;
+  }
+});
+
+test('Ohne Warnfeld auf der Seite gibt es keinen Fehler', () => {
+  const warning = document.getElementById('stone-warning');
+  warning.remove();
+  try {
+    const settings = new Settings();
+    settings.set('stoneMine', 'blue');
+    settings.set('stoneOpponent', 'blue');
+    assert.ok(document.documentElement.style.getPropertyValue('--user-stone-b'));
+  } finally {
+    document.body.prepend(warning);
+  }
+});

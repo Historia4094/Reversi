@@ -92,3 +92,18 @@ test('Bei 0 bleibt die Anzeige stehen; stop blendet aus', (t) => {
   clock.stop();
   assert.equal(el.root.hidden, true);
 });
+
+test('Ohne Warn-Rückruf läuft die Uhr trotzdem durch die Warnschwelle', (t) => {
+  t.mock.timers.enable({ apis: ['setInterval', 'Date'] });
+  const el = {
+    root: document.getElementById('clock'),
+    time: document.getElementById('time'),
+    fill: document.getElementById('fill'),
+    label: document.getElementById('label'),
+  };
+  const clock = new ClockView(el);
+  clock.start(WARN_MS + 1000, 60_000, true, 'Deine Bedenkzeit');
+  t.mock.timers.tick(2000);
+  assert.equal(el.root.dataset.state, 'warn');
+  clock.stop();
+});

@@ -58,7 +58,8 @@ function isValid(key, value) {
   // bekannte Einstellung.
   if (!Object.hasOwn(DEFAULTS, key)) return false;
   if (typeof DEFAULTS[key] === 'boolean') return typeof value === 'boolean';
-  return ALLOWED[key]?.includes(value) ?? false;
+  // Jede Einstellung, die kein Schalter ist, steht in ALLOWED.
+  return ALLOWED[key].includes(value);
 }
 
 /**

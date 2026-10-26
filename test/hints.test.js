@@ -144,3 +144,28 @@ test('Ein Zustand ohne Zug für mich bringt keinen Hinweis', () => {
   );
   assert.deepEqual(stateNotices({ yourTurn: true, finished: false, legalMoves: [{}, {}] }), []);
 });
+
+test('Eigene Ecke und eigener großer Zug: aus eigener Sicht, positiver Ton', () => {
+  const notices = noticesFor(
+    [{ type: 'move', player: BLACK, row: 0, col: 0, flipped: BIG_FLIP, corner: true, auto: false }],
+    ctx,
+  );
+  assert.equal(notices.length, 2);
+  assert.match(notices[0].text, /^Ecke A1 gesichert/);
+  assert.match(notices[1].text, new RegExp(`^Starker Zug: ${BIG_FLIP} Steine`));
+  assert.ok(notices.every((n) => n.tone === 'good'));
+});
+
+test('Großer Zug des Gegners: neutraler Ton, mit Namen', () => {
+  const [notice] = noticesFor(
+    [{ type: 'move', player: WHITE, row: 2, col: 3, flipped: BIG_FLIP + 1, corner: false }],
+    ctx,
+  );
+  assert.equal(notice.text, `Bruno dreht ${BIG_FLIP + 1} Steine auf einmal.`);
+  assert.equal(notice.tone, 'info');
+});
+
+test('Unbekannter Name des Gegners: "Dein Gegner"', () => {
+  const [notice] = noticesFor([{ type: 'pass', player: WHITE }], { me: BLACK, names: {} });
+  assert.match(notice.text, /^Dein Gegner /);
+});

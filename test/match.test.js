@@ -195,3 +195,12 @@ test('Ein Fehler beim Zeitablauf wird geloggt und hält den Prozess nicht an', a
   assert.ok(error.mock.callCount() >= 1);
   assert.match(String(error.mock.calls[0].arguments[0]), /Zeitablauf fehlgeschlagen/);
 });
+
+test('Ohne Rückrufe läuft eine Partie bis zur Aufgabe; danach ist Aufgeben abgelehnt', () => {
+  const match = new Match({ id: 'ohne', players, turnMs: 60_000 });
+  match.start();
+  assert.equal(match.resign(BLACK).ok, true);
+  assert.equal(match.over, true);
+  assert.deepEqual(match.resign(WHITE), { ok: false, reason: 'Die Partie ist beendet.' });
+  match.dispose();
+});

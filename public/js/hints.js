@@ -151,7 +151,8 @@ export function stateNotices(state) {
 
 /** Warum die Partie zu Ende ist – für das Ergebnisfenster. */
 export function endReasonText(result, { me, names }) {
-  const nameOf = (color) => (color === me ? 'Du' : (names[color] ?? 'Dein Gegner'));
+  // Nur für den Gegner: Die eigene Aufgabe hat unten eigene Sätze.
+  const nameOf = (color) => names[color] ?? 'Dein Gegner';
   const times = TIMES[result.maxTimeouts] ?? `${result.maxTimeouts}-mal`;
   switch (result.endReason) {
     case 'boardFull':

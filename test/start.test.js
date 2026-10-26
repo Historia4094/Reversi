@@ -13,9 +13,14 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-/** Startet den Server und wartet auf die Startmeldung. */
-function start(args, env = {}) {
-  const child = spawn(process.execPath, ['server/index.js', ...args], {
+/**
+ * Startet den Server und wartet auf die Startmeldung.
+ * @param {string[]} args Argumente für index.js (Port).
+ * @param {object} [env] Zusätzliche Umgebungsvariablen.
+ * @param {string[]} [nodeArgs] Optionen für Node selbst, z. B. --import.
+ */
+function start(args, env = {}, nodeArgs = []) {
+  const child = spawn(process.execPath, [...nodeArgs, 'server/index.js', ...args], {
     cwd: ROOT,
     env: { ...process.env, ...env },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -69,4 +74,49 @@ test('Ein belegter Port beendet den Start mit Code 1', async () => {
   assert.match(second.output(), /schon belegt/);
   first.child.kill('SIGTERM');
   await first.exited;
+});
+
+test('Ohne HOST: auf allen Adressen, Startmeldung mit localhost', async () => {
+  const server = start(['4393'], { HOST: '' });
+  await server.ready;
+  assert.match(server.output(), /läuft auf http:\/\/localhost:4393/);
+  assert.doesNotMatch(server.output(), /Nur unter/);
+  const response = await fetch('http://127.0.0.1:4393/');
+  assert.equal(response.status, 200);
+  server.child.kill('SIGTERM');
+  assert.equal(await server.exited, 0);
+});
+
+test('IPv6-Adresse als HOST steht in der Startmeldung in Klammern', async () => {
+  const server = start(['4394'], { HOST: '::1' });
+  await server.ready;
+  assert.match(server.output(), /läuft auf http:\/\/\[::1\]:4394/);
+  assert.match(server.output(), /Nur unter ::1 erreichbar/);
+  server.child.kill('SIGTERM');
+  assert.equal(await server.exited, 0);
+});
+
+test('Ein anderer Startfehler als ein belegter Port beendet mit Code 1', async () => {
+  // .invalid ist als Domain reserviert und wird nie aufgelöst.
+  const server = start(['4395'], { HOST: 'gibt-es-nicht.invalid' });
+  server.ready.catch(() => {}); // kommt nie
+  assert.equal(await server.exited, 1);
+  assert.match(server.output(), /Server konnte nicht starten/);
+});
+
+test('Ein unbehandelter Fehler wird geloggt, der Server läuft weiter', async () => {
+  // Löst kurz nach dem Start je einen Fehler und eine abgelehnte Promise
+  // aus, die niemand abfängt – so wie ein Fehler in einem Zeitgeber.
+  const trouble =
+    'data:text/javascript,setTimeout(()=>{throw new Error("Testfehler")},300);' +
+    'setTimeout(()=>Promise.reject(new Error("Testablehnung")),300);';
+  const server = start(['4396'], { HOST: '127.0.0.1' }, ['--import', trouble]);
+  await server.ready;
+  await new Promise((resolve) => setTimeout(resolve, 600));
+  assert.match(server.output(), /Unbehandelter Fehler:.*Testfehler/s);
+  assert.match(server.output(), /Unbehandelte Rejection:.*Testablehnung/s);
+  const response = await fetch('http://127.0.0.1:4396/');
+  assert.equal(response.status, 200, 'Server läuft nach dem Fehler weiter');
+  server.child.kill('SIGTERM');
+  assert.equal(await server.exited, 0);
 });
