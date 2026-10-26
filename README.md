@@ -236,4 +236,4 @@ Die Bedenkzeit, das Aufgeben und die Spielhilfen (Zugvorschau, Eckenmarkierung) 
 
 ## Online spielen
 
-Das Spiel läuft unter http://s252549-at-student-dhbw-mannheim-de.users.dhbw.site/ (IPv6 nötig).
+Das Spiel läuft unter https://s252549-at-student-dhbw-mannheim-de.users.dhbw.site/ (IPv6 nötig).
