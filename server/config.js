@@ -12,7 +12,7 @@
 import { DEFAULT_TURN_MS } from './match.js';
 
 export const DEFAULT_PORT = 3000;
-export const DEFAULT_MAX_CONNECTIONS_PER_IP = 50;
+export const DEFAULT_MAX_CONNECTIONS_PER_IP = 200;
 
 /**
  * Port: erstes CLI-Argument, sonst PORT, sonst 3000.
@@ -61,6 +61,31 @@ export function resolveTurnMs(raw, warn = console.warn) {
 export function resolveHost(raw) {
   const host = raw?.trim();
   return host ? host : undefined;
+}
+
+/**
+ * Zusätzlich erlaubte Seiten für Socket-Verbindungen (ALLOWED_ORIGINS),
+ * durch Kommas getrennt, z. B. "https://reversi.example.org". Nötig nur,
+ * wenn das Spiel unter einer Adresse aufgerufen wird, die beim Server
+ * weder als Host noch als X-Forwarded-Host ankommt (siehe limits.js).
+ * @param {string | undefined} raw
+ * @param {(message: string) => void} [warn]
+ * @returns {string[]}
+ */
+export function resolveAllowedOrigins(raw, warn = console.warn) {
+  if (!raw) return [];
+  const origins = [];
+  for (const entry of raw
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)) {
+    try {
+      origins.push(new URL(entry).origin);
+    } catch {
+      warn(`Ungültiger Eintrag in ALLOWED_ORIGINS: "${entry}" – wird ignoriert.`);
+    }
+  }
+  return origins;
 }
 
 /**

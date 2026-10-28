@@ -1,0 +1,12 @@
+# HTTPS für Reversi auf dem Kursserver.
+#
+# Caddy holt das Zertifikat für den Namen automatisch bei Let's Encrypt und
+# erneuert es selbst. Voraussetzung: Der Name zeigt auf diesen Rechner, und
+# Port 80 und 443 sind von außen erreichbar (Let's Encrypt prüft über Port 80).
+#
+# reverse_proxy reicht alles an das Spiel weiter, auch die WebSocket-
+# Verbindung von Socket.io, und setzt dabei X-Forwarded-For.
+
+s252549-at-student-dhbw-mannheim-de.users.dhbw.site {
+	reverse_proxy 127.0.0.1:3000
+}

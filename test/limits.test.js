@@ -4,7 +4,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { RateLimiter, ConnectionCounter, isSameOrigin, isHandshake } from '../server/limits.js';
+import {
+  RateLimiter,
+  ConnectionCounter,
+  isSameOrigin,
+  isHandshake,
+  clientAddress,
+} from '../server/limits.js';
 
 const request = (headers, url = '/socket.io/?EIO=4&transport=websocket') => ({ headers, url });
 
@@ -66,4 +72,28 @@ test('Handshake: nur die erste Anfrage zählt als neue Verbindung', () => {
   assert.equal(isHandshake(request({})), true);
   assert.equal(isHandshake(request({}, '/socket.io/?EIO=4&transport=websocket&sid=abc')), false);
   assert.equal(isHandshake({ headers: {} }), true);
+});
+
+test('Herkunft hinter einem Proxy: X-Forwarded-Host zählt, Groß- und Kleinschreibung egal', () => {
+  const viaProxy = { host: 'localhost:3000', 'x-forwarded-host': 'Kurs.Example.org' };
+  assert.equal(isSameOrigin(request({ ...viaProxy, origin: 'https://kurs.example.org' })), true);
+  assert.equal(isSameOrigin(request({ ...viaProxy, origin: 'https://evil.example' })), false);
+  assert.equal(
+    isSameOrigin(request({ host: 'localhost:3000', origin: 'https://kurs.example.org' }), [
+      'https://kurs.example.org',
+    ]),
+    true,
+    'ALLOWED_ORIGINS',
+  );
+});
+
+test('Adresse: X-Forwarded-For nur, wenn die Verbindung vom eigenen Rechner kommt', () => {
+  const req = (peer, forwarded) => ({
+    socket: { remoteAddress: peer },
+    headers: forwarded ? { 'x-forwarded-for': forwarded } : {},
+  });
+  assert.equal(clientAddress(req('10.1.2.3', '1.1.1.1')), '10.1.2.3', 'von außen gefälscht');
+  assert.equal(clientAddress(req('127.0.0.1', '10.9.9.9, 127.0.0.1')), '10.9.9.9');
+  assert.equal(clientAddress(req('::1')), '::1');
+  assert.equal(clientAddress({ headers: {} }), 'unbekannt');
 });

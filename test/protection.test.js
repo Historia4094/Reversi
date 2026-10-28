@@ -97,3 +97,45 @@ test('Grenze für Verbindungen je Adresse', async (t) => {
   t.after(() => fourth.disconnect());
   await connected(fourth);
 });
+
+test('Hinter einem Proxy: eigene Seite über X-Forwarded-Host angenommen, fremde abgelehnt', async (t) => {
+  const { url, game } = await startServer();
+  t.after(() => game.close());
+  const own = newClient(url, {
+    extraHeaders: { origin: 'https://kurs.example.org', 'x-forwarded-host': 'kurs.example.org' },
+  });
+  const foreign = newClient(url, {
+    extraHeaders: { origin: 'https://evil.example', 'x-forwarded-host': 'kurs.example.org' },
+    reconnection: false,
+  });
+  t.after(() => {
+    own.disconnect();
+    foreign.disconnect();
+  });
+  const rejected = once(foreign, 'connect_error');
+  await connected(own);
+  await rejected;
+});
+
+test('ALLOWED_ORIGINS lässt eine weitere Seite zu und warnt bei anderen einmal', async (t) => {
+  const warnings = [];
+  const { url, game } = await startServer({
+    allowedOrigins: ['https://reversi.example.org'],
+    logger: { log() {}, warn: (m) => warnings.push(m), error() {} },
+  });
+  t.after(() => game.close());
+  const allowed = newClient(url, { extraHeaders: { origin: 'https://reversi.example.org' } });
+  const other = newClient(url, {
+    extraHeaders: { origin: 'https://evil.example' },
+    reconnection: false,
+  });
+  t.after(() => {
+    allowed.disconnect();
+    other.disconnect();
+  });
+  const rejected = once(other, 'connect_error');
+  await connected(allowed);
+  await rejected;
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /ALLOWED_ORIGINS=https:\/\/evil\.example/);
+});

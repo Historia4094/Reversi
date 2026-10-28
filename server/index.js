@@ -10,14 +10,25 @@
 import os from 'node:os';
 
 import { createGameServer } from './app.js';
-import { resolveHost, resolveMaxConnectionsPerIp, resolvePort, resolveTurnMs } from './config.js';
+import {
+  resolveAllowedOrigins,
+  resolveHost,
+  resolveMaxConnectionsPerIp,
+  resolvePort,
+  resolveTurnMs,
+} from './config.js';
 
 const PORT = resolvePort({ arg: process.argv[2], env: process.env.PORT });
 const TURN_MS = resolveTurnMs(process.env.TURN_SECONDS);
 const HOST = resolveHost(process.env.HOST);
 const MAX_CONNECTIONS_PER_IP = resolveMaxConnectionsPerIp(process.env.MAX_CONNECTIONS_PER_IP);
+const ALLOWED_ORIGINS = resolveAllowedOrigins(process.env.ALLOWED_ORIGINS);
 
-const game = createGameServer({ turnMs: TURN_MS, maxConnectionsPerIp: MAX_CONNECTIONS_PER_IP });
+const game = createGameServer({
+  turnMs: TURN_MS,
+  maxConnectionsPerIp: MAX_CONNECTIONS_PER_IP,
+  allowedOrigins: ALLOWED_ORIGINS,
+});
 
 // Letzte Absicherung. Normalerweise beendet Node sich bei einem
 // unbehandelten Fehler. Die Aufgabe verlangt aber ausdrücklich, dass der

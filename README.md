@@ -207,7 +207,7 @@ Jeder Zug hat 60 Sekunden, die Uhr läuft auf dem Server. Läuft die Zeit ab, se
 - Ungültige Nachrichten (falsche Koordinaten, Zug außerhalb der Reihe) lehnt der Server ab.
 - Fehler in einem Socket-Handler werden abgefangen und geloggt, damit der Server nicht abstürzt und andere Partien weiterlaufen.
 - Mehrere Partien laufen unabhängig voneinander.
-- Socket-Verbindungen von fremden Webseiten lehnt der Server ab. Er nimmt höchstens 50 Verbindungen je IP-Adresse an (`MAX_CONNECTIONS_PER_IP`), Nachrichten bis 4 KB und 20 Nachrichten pro Sekunde und Verbindung. Darüber verwirft er sie, damit eine Flut nicht die anderen Partien bremst.
+- Socket-Verbindungen von fremden Webseiten lehnt der Server ab. Er nimmt höchstens 200 Verbindungen je IP-Adresse an (`MAX_CONNECTIONS_PER_IP`), Nachrichten bis 4 KB und 20 Nachrichten pro Sekunde und Verbindung. Darüber verwirft er sie, damit eine Flut nicht die anderen Partien bremst.
 - Nach einem abgelehnten Zug schickt der Server das ganze Brett höchstens einmal pro Sekunde mit, nicht nach jeder Ablehnung.
 
 ## Regeln und Herkunft
@@ -237,3 +237,21 @@ Die Bedenkzeit, das Aufgeben und die Spielhilfen (Zugvorschau, Eckenmarkierung) 
 ## Online spielen
 
 Das Spiel läuft unter https://s252549-at-student-dhbw-mannheim-de.users.dhbw.site/ (IPv6 nötig).
+
+## Betrieb auf dem Kursserver mit HTTPS
+
+Node selbst spricht nur HTTP. HTTPS übernimmt [Caddy](https://caddyserver.com/) als Proxy davor: Caddy holt das Zertifikat automatisch bei Let's Encrypt, nimmt die Verbindungen auf Port 443 an und reicht sie an das Spiel auf Port 3000 weiter, WebSocket eingeschlossen. Die Einstellung steht in `deploy/Caddyfile`.
+
+```bash
+npm install --omit=dev
+HOST=127.0.0.1 nohup node server/index.js 3000 > reversi.log 2>&1 &
+echo $! > reversi.pid
+sudo cp deploy/Caddyfile /etc/caddy/Caddyfile
+sudo systemctl reload caddy
+```
+
+- `--omit=dev` installiert nur Express und Socket.io, nicht die Werkzeuge für Tests und Prüfung. Zum Spielen reicht Node 18 oder neuer (Express 5).
+- `HOST=127.0.0.1`: Das Spiel ist dann nur über Caddy erreichbar, also nur über HTTPS, nicht zusätzlich unverschlüsselt über Port 3000.
+- Caddy gibt den ursprünglichen Host weiter, deshalb passt die Herkunftsprüfung ohne weitere Einstellung. Für die Grenze je Adresse zählt die Adresse aus `X-Forwarded-For`, weil die Verbindungen von Caddy auf demselben Rechner kommen.
+- Hinter einem anderen Proxy, der den Host nicht weitergibt, nennt der Server im Log den Wert für `ALLOWED_ORIGINS`. Alle Pfade im Client sind relativ, das Spiel läuft also auch unter einem Unterpfad.
+- Beenden: `kill $(cat reversi.pid)`.

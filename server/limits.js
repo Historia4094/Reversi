@@ -27,16 +27,51 @@ export const MESSAGES_PER_SECOND = 20;
  * localhost, der LAN-Adresse und der Adresse des Kursservers erreichbar
  * ist. Fehlt die Origin, ist das kein Cross-Site-Fall: Browser senden sie
  * bei WebSocket immer, nur Node-Clients (Tests) lassen sie weg.
+ *
+ * Läuft der Server hinter einem Proxy (z. B. nginx auf dem Kursserver),
+ * kommt oft ein anderer Host an, etwa "localhost:3000". Der Proxy nennt
+ * den ursprünglichen dann in X-Forwarded-Host; der zählt ebenfalls. Das
+ * schwächt den Schutz nicht: Eine fremde Webseite kann im Browser keine
+ * eigenen Header an eine WebSocket-Verbindung hängen. Für alles andere
+ * gibt es ALLOWED_ORIGINS (allowed).
  * @param {import('node:http').IncomingMessage} req
+ * @param {string[]} [allowed] zusätzlich erlaubte Origins, z. B. "https://spiel.example"
  */
-export function isSameOrigin(req) {
+export function isSameOrigin(req, allowed = []) {
   const origin = req.headers.origin;
   if (origin === undefined) return true;
+  let url;
   try {
-    return new URL(origin).host === req.headers.host;
+    url = new URL(origin);
   } catch {
     return false;
   }
+  if (allowed.includes(url.origin)) return true;
+  const hosts = [req.headers.host, ...String(req.headers['x-forwarded-host'] ?? '').split(',')]
+    .map((host) => host?.trim().toLowerCase())
+    .filter(Boolean);
+  return hosts.includes(url.host);
+}
+
+const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+
+/**
+ * Adresse des Spielers, für die Grenze je Adresse.
+ *
+ * Kommt die Verbindung von diesem Rechner selbst, ist das meist ein Proxy.
+ * Dann stünden alle Spieler unter derselben Adresse 127.0.0.1, und die
+ * Grenze träfe alle gemeinsam. Nennt der Proxy die echte Adresse in
+ * X-Forwarded-For, zählt diese. Von außen wird der Header nicht beachtet,
+ * weil ihn jeder Client selbst setzen könnte.
+ * @param {import('node:http').IncomingMessage} req
+ */
+export function clientAddress(req) {
+  const peer = req.socket?.remoteAddress ?? 'unbekannt';
+  if (!LOOPBACK.has(peer)) return peer;
+  const forwarded = String(req.headers['x-forwarded-for'] ?? '')
+    .split(',')[0]
+    .trim();
+  return forwarded || peer;
 }
 
 /**

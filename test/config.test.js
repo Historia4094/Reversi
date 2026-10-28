@@ -9,6 +9,7 @@ import {
   resolveTurnMs,
   resolveHost,
   resolveMaxConnectionsPerIp,
+  resolveAllowedOrigins,
   DEFAULT_PORT,
   DEFAULT_MAX_CONNECTIONS_PER_IP,
 } from '../server/config.js';
@@ -61,4 +62,14 @@ test('Verbindungen je IP: Standard, gültige und ungültige Werte', () => {
   assert.equal(resolveMaxConnectionsPerIp('1', warn), DEFAULT_MAX_CONNECTIONS_PER_IP);
   assert.equal(resolveMaxConnectionsPerIp('2.5', warn), DEFAULT_MAX_CONNECTIONS_PER_IP);
   assert.equal(list.length, 2);
+});
+
+test('ALLOWED_ORIGINS: Liste von Seiten, ungültige Einträge mit Warnung', () => {
+  const { list, warn } = warnings();
+  assert.deepEqual(resolveAllowedOrigins(undefined), []);
+  assert.deepEqual(
+    resolveAllowedOrigins(' https://Reversi.Example.org/spiel , http://10.0.0.5:3000,kaputt', warn),
+    ['https://reversi.example.org', 'http://10.0.0.5:3000'],
+  );
+  assert.equal(list.length, 1);
 });

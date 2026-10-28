@@ -120,10 +120,14 @@ test('Ergebnisfenster: Texte, leerer Grund ausgeblendet, Knöpfe', () => {
 test('net.js: Ereignisse an die Handler, Absichten an den Server', () => {
   const listeners = {};
   const sent = [];
-  window.io = () => ({
-    on: (event, fn) => (listeners[event] = fn),
-    emit: (...args) => sent.push(args),
-  });
+  let options;
+  window.io = (opts) => {
+    options = opts;
+    return {
+      on: (event, fn) => (listeners[event] = fn),
+      emit: (...args) => sent.push(args),
+    };
+  };
   const calls = [];
   const net = connect({
     state: (payload) => calls.push(['state', payload]),
@@ -136,6 +140,7 @@ test('net.js: Ereignisse an die Handler, Absichten an den Server', () => {
   listeners.disconnect();
   listeners.connect_error();
   assert.deepEqual(calls, [['state', { a: 1 }], ['connected'], ['lost'], ['lost']]);
+  assert.equal(options.path, '/socket.io', 'Pfad relativ zur Seite');
   net.join('Anna', 2);
   net.move(1, 2);
   net.resign();

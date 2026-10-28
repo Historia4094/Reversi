@@ -8,8 +8,13 @@
  * nie einen Punktestand und nie, wer gewonnen hat.
  */
 export function connect(handlers) {
-  // socket.io.js wird vom Server unter /socket.io/ ausgeliefert.
-  const socket = window.io();
+  // socket.io.js wird vom Server unter socket.io/ ausgeliefert. Der Pfad
+  // wird relativ zur Seite gebildet: Unter http://server:3000/ ist das
+  // /socket.io, hinter einem Proxy unter einem Unterpfad (z. B.
+  // https://server/reversi/) /reversi/socket.io. Fest "/socket.io" ginge
+  // dort ins Leere.
+  const path = new URL('socket.io', window.location.href).pathname;
+  const socket = window.io({ path });
 
   const events = [
     'waiting',

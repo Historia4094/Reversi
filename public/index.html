@@ -540,8 +540,9 @@
       </div>
     </dialog>
 
-    <!-- Vom Server ausgeliefert, sobald Socket.io läuft. -->
-    <script src="/socket.io/socket.io.js"></script>
+    <!-- Vom Server ausgeliefert, sobald Socket.io läuft. Relativer Pfad,
+       damit das Spiel auch unter einem Unterpfad läuft (net.js). -->
+    <script src="socket.io/socket.io.js"></script>
     <script type="module" src="js/main.js"></script>
   </body>
 </html>

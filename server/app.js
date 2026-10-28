@@ -29,6 +29,7 @@ import { cleanName, FALLBACK_NAME } from '../public/shared/names.js';
 import {
   ConnectionCounter,
   RateLimiter,
+  clientAddress,
   isHandshake,
   isSameOrigin,
   MAX_MESSAGE_BYTES,
@@ -51,12 +52,14 @@ const CORRECTION_INTERVAL_MS = 1000;
  * @param {number} [options.turnMs] Bedenkzeit pro Zug.
  * @param {number} [options.maxConnectionsPerIp]
  * @param {number} [options.messagesPerSecond] Grenze pro Socket, siehe limits.js.
+ * @param {string[]} [options.allowedOrigins] zusätzlich erlaubte Seiten (ALLOWED_ORIGINS).
  * @param {Pick<Console, 'log' | 'warn' | 'error'>} [options.logger] In Tests still.
  */
 export function createGameServer({
   turnMs = DEFAULT_TURN_MS,
   maxConnectionsPerIp = DEFAULT_MAX_CONNECTIONS_PER_IP,
   messagesPerSecond,
+  allowedOrigins = [],
   logger = console,
 } = {}) {
   const app = express();
@@ -70,13 +73,29 @@ export function createGameServer({
     maxHttpBufferSize: MAX_MESSAGE_BYTES,
     // Läuft vor dem Handshake, also bevor die Verbindung Speicher kostet.
     allowRequest: (req, callback) => {
-      if (!isSameOrigin(req)) return callback('Fremde Herkunft', false);
-      if (isHandshake(req) && !connections.canConnect(addressOf(req))) {
+      if (!isSameOrigin(req, allowedOrigins)) {
+        warnOnce(
+          `origin:${req.headers.origin}`,
+          `Verbindung abgelehnt: Die Seite ${req.headers.origin} passt nicht zur Adresse ` +
+            `${req.headers.host}. Gehört sie zum Spiel (z. B. hinter einem Proxy), ` +
+            `ALLOWED_ORIGINS=${req.headers.origin} setzen.`,
+        );
+        return callback('Fremde Herkunft', false);
+      }
+      if (isHandshake(req) && !connections.canConnect(clientAddress(req))) {
         return callback('Zu viele Verbindungen von dieser Adresse', false);
       }
       return callback(null, true);
     },
   });
+
+  /** Jede Warnung nur einmal, damit ein wiederholender Client das Log nicht füllt. */
+  const warned = new Set();
+  function warnOnce(key, message) {
+    if (warned.has(key)) return;
+    warned.add(key);
+    logger.warn(message);
+  }
 
   const lobby = new Lobby({
     createMatch: (id, players) =>
@@ -229,8 +248,13 @@ export function createGameServer({
   // auf, kommen sie dort alle durch, bevor die erste gezählt ist. Hier
   // dagegen geschehen Prüfen und Zählen in einem Schritt.
   io.use((socket, next) => {
-    const address = socket.conn.remoteAddress;
+    const address = clientAddress(socket.request);
     if (!connections.canConnect(address)) {
+      warnOnce(
+        `limit:${address}`,
+        `Grenze von ${maxConnectionsPerIp} Verbindungen für ${address} erreicht ` +
+          '(MAX_CONNECTIONS_PER_IP).',
+      );
       next(new Error('Zu viele Verbindungen von dieser Adresse'));
       return;
     }
@@ -273,9 +297,4 @@ export function createGameServer({
       return new Promise((resolve) => io.close(() => resolve()));
     },
   };
-}
-
-/** IP-Adresse des Aufrufers (vor dem Handshake noch ohne Socket). */
-function addressOf(req) {
-  return req.socket.remoteAddress ?? 'unbekannt';
 }
